@@ -32,7 +32,7 @@ In a terminal, go to the folder and compile.
 cd autonomy_stack_go2
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
-Download a [Unity environment model for Go2](https://drive.google.com/drive/folders/11GhvA8Jz1RnRSGfiQ_MDJ4X-aNMpQPPx?usp=drive_link) and unzip to the 'src/base_autonomy/vehicle_simulator/mesh/unity' folder. The environment model files should look like below.
+Download a [Unity environment model for Go2](https://drive.google.com/drive/folders/1CeAA5aeXCk8Sh3ZuJR7UME6sQZFuaorf?usp=sharing) and unzip to the 'src/base_autonomy/vehicle_simulator/mesh/unity' folder. The environment model files should look like below.
 
 mesh/<br>
 &nbsp;&nbsp;&nbsp;&nbsp;unity/<br>
@@ -180,7 +180,7 @@ To record the lidar and IMU data to a bagfile, use the command line below in an
 ```
 ros2 bag record /utlidar/cloud /utlidar/imu
 ```
-Users can copy the bagfile to an external computer. Please copy the 'imu_calib_data.yaml' file as well and put it on the external computer desktop. [Example bagfile and 'imu_calib_data.yaml' file](https://drive.google.com/drive/folders/11GhvA8Jz1RnRSGfiQ_MDJ4X-aNMpQPPx?usp=drive_link) are provided. Launch the system with the same command lines above. In another terminal, play the bagfile. Note that the computer **should not connect to Go2** via Ethernet or the onboard sensor data may come in.
+Users can copy the bagfile to an external computer. Please copy the 'imu_calib_data.yaml' file as well and put it on the external computer desktop. [Example bagfile and 'imu_calib_data.yaml' file](https://drive.google.com/drive/folders/1CeAA5aeXCk8Sh3ZuJR7UME6sQZFuaorf?usp=sharing) are provided. Launch the system with the same command lines above. In another terminal, play the bagfile. Note that the computer **should not connect to Go2** via Ethernet or the onboard sensor data may come in.
 ```
 ros2 bag play bagfile_name.db3
 ```
