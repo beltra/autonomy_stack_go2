@@ -1,0 +1,5 @@
+far_planner:
+  ros__parameters:
+    is_multi_layer: true
+    map_handler/floor_height: 2.0
+    map_handler/cell_length: 2.5

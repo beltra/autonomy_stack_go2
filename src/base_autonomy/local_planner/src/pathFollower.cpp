@@ -14,6 +14,7 @@
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <sensor_msgs/msg/imu.h>
@@ -76,6 +77,9 @@ double autonomySpeed = 1.0;
 double joyToSpeedDelay = 2.0;
 double goalCloseDis = 1.0;
 bool is_real_robot = false;
+bool enableExternalHold = false;
+bool externalHold = false;
+string externalHoldTopic = "/stairs/hold_path_follower";
 
 float joySpeed = 0;
 float joySpeedRaw = 0;
@@ -209,6 +213,11 @@ void stopHandler(const std_msgs::msg::Int8::ConstSharedPtr stop)
   safetyStop = stop->data;
 }
 
+void holdHandler(const std_msgs::msg::Bool::ConstSharedPtr hold)
+{
+  externalHold = hold->data;
+}
+
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
@@ -246,6 +255,8 @@ int main(int argc, char** argv)
   nh->declare_parameter<double>("joyToSpeedDelay", joyToSpeedDelay);
   nh->declare_parameter<double>("goalCloseDis", goalCloseDis);
   nh->declare_parameter<bool>("is_real_robot", is_real_robot);
+  nh->declare_parameter<bool>("enableExternalHold", enableExternalHold);
+  nh->declare_parameter<string>("externalHoldTopic", externalHoldTopic);
 
   nh->get_parameter("sensorOffsetX", sensorOffsetX);
   nh->get_parameter("sensorOffsetY", sensorOffsetY);
@@ -279,6 +290,8 @@ int main(int argc, char** argv)
   nh->get_parameter("joyToSpeedDelay", joyToSpeedDelay);
   nh->get_parameter("goalCloseDis", goalCloseDis);
   nh->get_parameter("is_real_robot", is_real_robot);
+  nh->get_parameter("enableExternalHold", enableExternalHold);
+  nh->get_parameter("externalHoldTopic", externalHoldTopic);
 
   auto subOdom = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 5, odomHandler);
 
@@ -289,6 +302,11 @@ int main(int argc, char** argv)
   auto subSpeed = nh->create_subscription<std_msgs::msg::Float32>("/speed", 5, speedHandler);
 
   auto subStop = nh->create_subscription<std_msgs::msg::Int8>("/stop", 5, stopHandler);
+
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr subHold;
+  if (enableExternalHold) {
+    subHold = nh->create_subscription<std_msgs::msg::Bool>(externalHoldTopic, 5, holdHandler);
+  }
 
   auto pubSpeed = nh->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 5);
 
@@ -420,6 +438,12 @@ int main(int argc, char** argv)
           cmd_vel.twist.linear.x = maxSpeed * joyManualFwd;
           cmd_vel.twist.linear.y = maxSpeed / 2.0 * joyManualLeft;
           cmd_vel.twist.angular.z = maxYawRate * PI / 180.0 * joyManualYaw;
+        }
+
+        if (externalHold) {
+          cmd_vel.twist.linear.x = 0;
+          cmd_vel.twist.linear.y = 0;
+          cmd_vel.twist.angular.z = 0;
         }
 
         pubSpeed->publish(cmd_vel);

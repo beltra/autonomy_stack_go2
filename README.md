@@ -89,6 +89,54 @@ Users can send a goal point with the 'Goalpoint' button in RVIZ. The vehicle wil
   <img src="img/rviz_full_with_route_planner.jpg" alt="RVIZ with Route Planner" width="80%"/>
 </p>
 
+### Stairs / Multi-level (MVP)
+
+The repository now includes a first MVP for stairs-aware autonomy, with a Python supervisor package at `src/base_autonomy/stairs_autonomy`:
+
+- `stair_detector_lidar_imu`: detects stairs state from robot attitude (L1+IMU based).
+- `stair_supervisor`: arbitrates path follower hold/release and emits stair motion commands.
+- `motion_executor`: executes stair commands on `/api/sport/request` (legacy backend) with a ready switch for Motion Services Interface V2.
+
+By default, startup scripts keep this feature disabled for safety. Enable it via environment variables:
+
+```
+export ENABLE_STAIRS_AUTONOMY=true
+export STAIRS_MOTION_DRY_RUN=true
+export STAIRS_MOTION_BACKEND=legacy_sport_api
+./system_simulation.sh
+```
+
+For simulation with route planner and multi-layer routing:
+
+```
+export ENABLE_STAIRS_AUTONOMY=true
+export ENABLE_MULTI_LAYER_ROUTE=true
+./system_simulation_with_route_planner.sh
+```
+
+For Unity multi-level map builds, place your custom binary under `src/base_autonomy/vehicle_simulator/mesh/unity/environment_multi_level/Model.x86_64` and set:
+
+```
+export UNITY_MULTI_LEVEL_MAP=true
+```
+
+To bootstrap a Unity multi-level garage scene from the CMU Exploration environments package:
+
+1. Download the simulation environments ZIP from CMU Exploration (contains garage scene assets).
+2. Import it into this repository layout:
+
+```
+./src/base_autonomy/vehicle_simulator/mesh/unity/setup_cmu_multilevel_garage.sh --zip /path/to/environments.zip --clean
+```
+
+3. Launch a profile preconfigured for multi-level autonomy testing:
+
+```
+./system_simulation_multilevel_garage.sh
+```
+
+This launcher enables Unity multi-level map selection, FAR multi-layer routing, and stairs autonomy flags by default.
+
 ## Real-robot Setup
 
 ### Hardware

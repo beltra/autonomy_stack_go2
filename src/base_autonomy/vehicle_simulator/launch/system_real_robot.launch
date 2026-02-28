@@ -7,6 +7,9 @@
   <arg name="vehicleX" default="0.0"/>
   <arg name="vehicleY" default="0.0"/>
   <arg name="checkTerrainConn" default="true"/>
+  <arg name="enable_stairs_autonomy" default="false"/>
+  <arg name="stairs_motion_dry_run" default="true"/>
+  <arg name="stairs_motion_backend" default="legacy_sport_api"/>
 
   <node pkg="joy" exec="joy_node" name="ps3_joy" output="screen" >
     <param name="dev" value="/dev/input/js0" />
@@ -28,6 +31,7 @@
     <arg name="cameraOffsetZ" value="$(var cameraOffsetZ)"/>
     <arg name="goalX" value="$(var vehicleX)"/>
     <arg name="goalY" value="$(var vehicleY)"/>
+    <arg name="enableExternalHold" value="$(var enable_stairs_autonomy)"/>
   </include>
 
   <include file="$(find-pkg-share terrain_analysis)/launch/terrain_analysis.launch" />
@@ -37,6 +41,15 @@
   </include> -->
 
   <!-- <include file="$(find-pkg-share sensor_scan_generation)/launch/sensor_scan_generation.launch" /> -->
+
+  <node if="$(var enable_stairs_autonomy)" pkg="stairs_autonomy" exec="stair_detector_lidar_imu" name="stair_detector_lidar_imu" output="screen"/>
+
+  <node if="$(var enable_stairs_autonomy)" pkg="stairs_autonomy" exec="stair_supervisor" name="stair_supervisor" output="screen"/>
+
+  <node if="$(var enable_stairs_autonomy)" pkg="stairs_autonomy" exec="motion_executor" name="stairs_motion_executor" output="screen">
+    <param name="dry_run" value="$(var stairs_motion_dry_run)"/>
+    <param name="motion_backend" value="$(var stairs_motion_backend)"/>
+  </node>
 
   <!-- <include file="$(find-pkg-share visualization_tools)/launch/visualization_tools.launch" >
     <arg name="world_name" value="$(var world_name)"/>
