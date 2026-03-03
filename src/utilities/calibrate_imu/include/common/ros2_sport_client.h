@@ -38,6 +38,22 @@ const int32_t ROBOT_SPORT_API_ID_SCRAPE = 1029;
 const int32_t ROBOT_SPORT_API_ID_FRONTFLIP = 1030;
 const int32_t ROBOT_SPORT_API_ID_FRONTJUMP = 1031;
 const int32_t ROBOT_SPORT_API_ID_FRONTPOUNCE = 1032;
+const int32_t ROBOT_SPORT_API_ID_HEART = 1036;
+const int32_t ROBOT_SPORT_API_ID_STATICWALK = 1061;
+const int32_t ROBOT_SPORT_API_ID_TROTRUN = 1062;
+const int32_t ROBOT_SPORT_API_ID_ECONOMICGAIT = 1063;
+const int32_t ROBOT_SPORT_API_ID_LEFTFLIP = 2041;
+const int32_t ROBOT_SPORT_API_ID_BACKFLIP = 2043;
+const int32_t ROBOT_SPORT_API_ID_HANDSTAND = 2044;
+const int32_t ROBOT_SPORT_API_ID_FREEWALK = 2045;
+const int32_t ROBOT_SPORT_API_ID_FREEBOUND = 2046;
+const int32_t ROBOT_SPORT_API_ID_FREEJUMP = 2047;
+const int32_t ROBOT_SPORT_API_ID_FREEAVOID = 2048;
+const int32_t ROBOT_SPORT_API_ID_CLASSICWALK = 2049;
+const int32_t ROBOT_SPORT_API_ID_WALKUPRIGHT = 2050;
+const int32_t ROBOT_SPORT_API_ID_CROSSSTEP = 2051;
+const int32_t ROBOT_SPORT_API_ID_AUTORECOVERY_SET = 2054;
+const int32_t ROBOT_SPORT_API_ID_SWITCHAVOIDMODE = 2058;
 
 typedef struct
 {
@@ -226,6 +242,102 @@ public:
      * @api: 1023
      */
     void Dance2(unitree_api::msg::Request &req);
+
+    /*
+     * @brief Heart
+     * @api: 1036
+     */
+    void Heart(unitree_api::msg::Request &req);
+
+    /*
+     * @brief StaticWalk
+     * @api: 1061
+     */
+    void StaticWalk(unitree_api::msg::Request &req);
+
+    /*
+     * @brief TrotRun
+     * @api: 1062
+     */
+    void TrotRun(unitree_api::msg::Request &req);
+
+    /*
+     * @brief EconomicGait
+     * @api: 1063
+     */
+    void EconomicGait(unitree_api::msg::Request &req);
+
+    /*
+     * @brief LeftFlip
+     * @api: 2041
+     */
+    void LeftFlip(unitree_api::msg::Request &req);
+
+    /*
+     * @brief BackFlip
+     * @api: 2043
+     */
+    void BackFlip(unitree_api::msg::Request &req);
+
+    /*
+     * @brief HandStand
+     * @api: 2044
+     */
+    void HandStand(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief FreeWalk
+     * @api: 2045
+     */
+    void FreeWalk(unitree_api::msg::Request &req);
+
+    /*
+     * @brief FreeBound
+     * @api: 2046
+     */
+    void FreeBound(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief FreeJump
+     * @api: 2047
+     */
+    void FreeJump(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief FreeAvoid
+     * @api: 2048
+     */
+    void FreeAvoid(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief ClassicWalk
+     * @api: 2049
+     */
+    void ClassicWalk(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief WalkUpright
+     * @api: 2050
+     */
+    void WalkUpright(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief CrossStep
+     * @api: 2051
+     */
+    void CrossStep(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief AutoRecoverySet
+     * @api: 2054
+     */
+    void AutoRecoverySet(unitree_api::msg::Request &req, bool flag);
+
+    /*
+     * @brief SwitchAvoidMode
+     * @api: 2058
+     */
+    void SwitchAvoidMode(unitree_api::msg::Request &req);
 };
 
 #endif

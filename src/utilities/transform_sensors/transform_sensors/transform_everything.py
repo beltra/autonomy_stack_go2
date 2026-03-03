@@ -45,14 +45,13 @@ class Repuber(Node):
                 'ang_z2y_proj': -0.28
             }
         try:
-            home_path = os.path.expanduser('~')
-            calib_file_path = os.path.join(home_path, 'Desktop/imu_calib_data.yaml')
+            calib_file_path = '/ws/autonomy_stack_go2/imu_calib_data.yaml'
             calib_file = open(calib_file_path, 'r')
             calib_data = yaml.load(calib_file, Loader=yaml.FullLoader)
-            print("imu_calib.yaml loaded")
+            self.get_logger().info("imu_calib_data.yaml loaded from /ws/autonomy_stack_go2/imu_calib_data.yaml")
             calib_file.close()
         except:
-            print("imu_calib.yaml not found, using defualt values")
+            self.get_logger().warn("imu_calib_data.yaml not found, using default values")
             
         self.acc_bias_x = calib_data['acc_bias_x']
         self.acc_bias_y = calib_data['acc_bias_y']
