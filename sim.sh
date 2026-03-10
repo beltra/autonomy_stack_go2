@@ -2,8 +2,9 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-cd $SCRIPT_DIR
-source ./install/setup.bash
+source "$SCRIPT_DIR/launch_common.sh"
+setup_workspace
+
 ./src/base_autonomy/vehicle_simulator/mesh/unity/environment/Model.x86_64 &
-sleep 3 
+sleep 3
 ros2 launch vehicle_simulator system_simulation.launch

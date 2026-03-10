@@ -16,6 +16,22 @@ import yaml
 
 import os
 
+
+def resolve_calibration_file_path():
+    file_name = 'imu_calib_data.yaml'
+    cwd = os.path.abspath(os.getcwd())
+    candidates = [
+        os.path.join(cwd, file_name),
+        os.path.abspath(os.path.join(cwd, '..', file_name)),
+    ]
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+
+    # Default target if file does not exist yet
+    return candidates[0]
+
 class Repuber(Node):
     def __init__(self):
         super().__init__('sensor_transformer')
@@ -44,14 +60,13 @@ class Repuber(Node):
                 'ang_z2x_proj': 0.15,
                 'ang_z2y_proj': -0.28
             }
+        calib_file_path = resolve_calibration_file_path()
         try:
-            calib_file_path = '/ws/autonomy_stack_go2/imu_calib_data.yaml'
-            calib_file = open(calib_file_path, 'r')
-            calib_data = yaml.load(calib_file, Loader=yaml.FullLoader)
-            self.get_logger().info("imu_calib_data.yaml loaded from /ws/autonomy_stack_go2/imu_calib_data.yaml")
-            calib_file.close()
-        except:
-            self.get_logger().warn("imu_calib_data.yaml not found, using default values")
+            with open(calib_file_path, 'r') as calib_file:
+                calib_data = yaml.load(calib_file, Loader=yaml.FullLoader)
+            self.get_logger().info(f"imu_calib_data.yaml loaded from {calib_file_path}")
+        except Exception:
+            self.get_logger().warn(f"imu_calib_data.yaml not found at {calib_file_path}, using default values")
             
         self.acc_bias_x = calib_data['acc_bias_x']
         self.acc_bias_y = calib_data['acc_bias_y']

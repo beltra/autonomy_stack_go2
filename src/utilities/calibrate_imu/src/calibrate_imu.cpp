@@ -28,6 +28,37 @@ double ang_bias_z = 0;
 double ang_z2x_proj = 0;
 double ang_z2y_proj = 0;
 
+bool file_exists(const std::string &path)
+{
+    std::ifstream f(path);
+    return f.good();
+}
+
+std::string resolve_calibration_file_path()
+{
+    const std::string file_name = "imu_calib_data.yaml";
+
+    char cwd_raw[4096];
+    if (getcwd(cwd_raw, sizeof(cwd_raw)) == nullptr) {
+        return file_name;
+    }
+
+    const std::string cwd(cwd_raw);
+    const std::vector<std::string> candidates = {
+        cwd + "/" + file_name,
+        cwd + "/../" + file_name
+    };
+
+    for (const auto &candidate : candidates) {
+        if (file_exists(candidate)) {
+            return candidate;
+        }
+    }
+
+    // Default target if file does not exist yet
+    return candidates.front();
+}
+
 void imu_handler(const sensor_msgs::msg::Imu::ConstSharedPtr msg_in)
 {
     double theta = 15.1 / 180 * 3.1415926; // Convert it to z-up
@@ -65,7 +96,7 @@ void imu_handler(const sensor_msgs::msg::Imu::ConstSharedPtr msg_in)
 }
 
 void serialize_to_file(){
-    std::string file_path = "/ws/autonomy_stack_go2/imu_calib_data.yaml";
+    std::string file_path = resolve_calibration_file_path();
     std::ofstream file;
     file.open(file_path, std::ios::out);
     file << "acc_bias_x: " << acc_bias_x << std::endl;

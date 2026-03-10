@@ -6,12 +6,15 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node, SetParameter
 from ament_index_python.packages import get_package_share_directory
 from launch.substitutions import PythonExpression
+import launch.conditions
 import launch_ros
 
 def generate_launch_description():
     return LaunchDescription([
-        SetParameter(name='use_sim_time', value='false'),
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
+        SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time')),
         DeclareLaunchArgument('config', default_value='default'),
+        DeclareLaunchArgument('rviz', default_value='true'),
 
         Node(
             package='far_planner',
@@ -38,6 +41,7 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             name='far_rviz',
+            prefix='nice',
             arguments=['-d', 
                 PythonExpression([
                 '"', 
@@ -47,6 +51,7 @@ def generate_launch_description():
                 '.rviz"'])
             ],
             respawn=False,
+            condition=launch.conditions.IfCondition(LaunchConfiguration('rviz')),
         ),
 
         # Including another launch file

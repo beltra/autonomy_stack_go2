@@ -8,7 +8,8 @@
   <arg name="vehicleY" default="0.0"/>
   <arg name="checkTerrainConn" default="true"/>
   <arg name="enableClassicWalk" default="true"/>
-  <arg name="disableClassicWalkOnExit" default="true"/>
+  <arg name="disableClassicWalkOnExit" default="false"/>
+  <arg name="rviz" default="true"/>
 
   <node pkg="joy" exec="joy_node" name="ps3_joy" output="screen" >
     <param name="dev" value="/dev/input/js0" />
@@ -22,6 +23,7 @@
 
   <include file="$(find-pkg-share point_lio_unilidar)/launch/mapping_utlidar.launch">
     <arg name="rviz" value="false"/>
+    <arg name="use_sim_time" value="false"/>
   </include>
 
   <include file="$(find-pkg-share local_planner)/launch/local_planner.launch" >
@@ -46,7 +48,7 @@
     <arg name="world_name" value="$(var world_name)"/>
   </include> -->
 
-  <node launch-prefix="nice" pkg="rviz2" exec="rviz2" name="rvizGA" args="-d $(find-pkg-share vehicle_simulator)/rviz/vehicle_simulator.rviz"/>
+  <node launch-prefix="nice" pkg="rviz2" exec="rviz2" name="rvizGA" args="-d $(find-pkg-share vehicle_simulator)/rviz/vehicle_simulator.rviz" if="$(var rviz)"/>
 
   <node pkg="tf2_ros" exec="static_transform_publisher" name="loamInterfaceTransPubMap" args="0 0 0 0 0 0 /map /camera_init"/>
 

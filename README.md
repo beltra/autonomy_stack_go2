@@ -51,7 +51,7 @@ mesh/<br>
 
 In a terminal, go to the repository folder and launch the system.
 ```
-./system_simulation.sh
+./sim.sh
 ```
 After seeing data showing up in RVIZ, users can use the 'Waypoint' button to set waypoints and navigate the vehicle around. Note that the waypoints are meant to be relatively close to the vehicle. Setting the waypoint too far can cause the vehicle to get stuck at a dead end. Users can also operate in *smart joystick mode* where the vehicle tries to follow joystick commands and also avoid collisions. To do this, users can use the control panel in RVIZ or a PS3/4 or Xbox controller with a USB or Bluetooth interface. When using the controller, users can also operate in *manual mode* without any collision avoidance. Detailed information about the operations in the three modes is below.
 
@@ -81,8 +81,9 @@ ros2 launch waypoint_example waypoint_example.launch
 
 To launch the system with route planner, use the command line below.
 ```
-./system_simulation_with_route_planner.sh
+./sim_route.sh
 ```
+Legacy `system_*.sh` script names are still available as compatibility wrappers.
 Users can send a goal point with the 'Goalpoint' button in RVIZ. The vehicle will navigate to the goal and build a visibility graph (in cyan) along the way. Areas covered by the visibility graph become free space. When navigating in free space, the planner uses the built visibility graph, and when navigating in unknown space, the planner attempts to discover a way to the goal. By pressing the 'Reset Visibility Graph' button, the planner will reinitialize the visibility graph. By unchecking the 'Planning Attemptable' checkbox, the planner will first try to find a path through the free space. The path will show in green. If such a path does not exist, the planner will consider unknown space together. The path will show in blue. By unchecking the 'Update Visibility Graph' checkbox, the planner will stop updating the visibility graph. When navigating with the route planner, the base system operates in *waypoint mode*. Users can click in the black box on the control panel to switch to *smart joystick mode*, or press the buttons on a joystick controller to switch to *smart joystick mode* or *manual mode*. To resume route planner navigation, click the 'Resume Navigation to Goal' button in RVIZ or use the 'Goalpoint' button to set a new goalpoint. More information about the route planner is available on the [FAR Planner website](https://github.com/MichaelFYang/far_planner).
 
 <p align="center">
@@ -165,11 +166,11 @@ ros2 run calibrate_imu calibrate_imu
 
 In a terminal, go to the repository folder and use the command line below to launch the system. This launches the SLAM module and the base autonomy system. If using an external computer, **source the 'unitree_ros2_setup.sh' script** first as mentioned in the Unitree instructions.
 ```
-./system_real_robot.sh
+./real.sh
 ```
 To launch the system with route planner, use the command line below instead.
 ```
-./system_real_robot_with_route_planner.sh
+./real_route.sh
 ```
 Users can follow the same operations as in the simulation setup to navigate Go2 in the environment. Please refer to the Simulation Setup section for operating the system in the *smart joystick mode*, *waypoint mode*, and *manual mode*. To launch the camera driver, in a separate terminal, go to the repository folder and use the command lines below. The camera driver takes an H.264 video stream and publishes images on the '/camera/image/raw' topic.
 ```

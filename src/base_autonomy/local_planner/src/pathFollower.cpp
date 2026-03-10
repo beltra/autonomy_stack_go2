@@ -311,6 +311,15 @@ int main(int argc, char** argv)
     else if (joySpeed > 1.0) joySpeed = 1.0;
   }
 
+  // Command the robot to stand up before switching walking mode
+  if (is_real_robot) {
+    unitree_api::msg::Request standReq;
+    sport_req.RecoveryStand(standReq);
+    pubGo2Request->publish(standReq);
+    RCLCPP_INFO(nh->get_logger(), "RecoveryStand command sent, waiting for robot to stand up...");
+    rclcpp::sleep_for(std::chrono::seconds(3));
+  }
+
   // Activate ClassicWalk mode on the real robot for better terrain adaptability
   // (stairs, gravel, slopes). Requires Go2 firmware >= V1.1.6.
   if (is_real_robot && enableClassicWalk) {
