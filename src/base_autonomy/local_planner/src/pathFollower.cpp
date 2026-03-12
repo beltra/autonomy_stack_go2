@@ -311,13 +311,37 @@ int main(int argc, char** argv)
     else if (joySpeed > 1.0) joySpeed = 1.0;
   }
 
+  // Wait for the sport API subscriber to be ready (DDS discovery delay)
+  if (is_real_robot) {
+    RCLCPP_INFO(nh->get_logger(), "Waiting for sport API subscriber...");
+    int wait_count = 0;
+    while (pubGo2Request->get_subscription_count() == 0 && wait_count < 50) {
+      rclcpp::sleep_for(std::chrono::milliseconds(100));
+      rclcpp::spin_some(nh);
+      wait_count++;
+    }
+    if (pubGo2Request->get_subscription_count() > 0) {
+      RCLCPP_INFO(nh->get_logger(), "Sport API subscriber connected.");
+    } else {
+      RCLCPP_WARN(nh->get_logger(), "No sport API subscriber found after timeout, commands may be lost.");
+    }
+  }
+
   // Command the robot to stand up before switching walking mode
   if (is_real_robot) {
-    unitree_api::msg::Request standReq;
-    sport_req.RecoveryStand(standReq);
-    pubGo2Request->publish(standReq);
-    RCLCPP_INFO(nh->get_logger(), "RecoveryStand command sent, waiting for robot to stand up...");
+    // First, recover from any fallen/lying state
+    unitree_api::msg::Request recoveryReq;
+    sport_req.RecoveryStand(recoveryReq);
+    pubGo2Request->publish(recoveryReq);
+    RCLCPP_INFO(nh->get_logger(), "RecoveryStand command sent...");
     rclcpp::sleep_for(std::chrono::seconds(3));
+
+    // Then, issue StandUp to ensure the robot is standing tall (API 1004)
+    unitree_api::msg::Request standUpReq;
+    sport_req.StandUp(standUpReq);
+    pubGo2Request->publish(standUpReq);
+    RCLCPP_INFO(nh->get_logger(), "StandUp command sent, waiting for robot to stand up...");
+    rclcpp::sleep_for(std::chrono::seconds(2));
   }
 
   // Activate ClassicWalk mode on the real robot for better terrain adaptability
