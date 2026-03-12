@@ -95,29 +95,42 @@ void GraphMsger::PublishGlobalGraph(const NodePtrStack& graphIn) {
 
 void GraphMsger::GraphCallBack(const visibility_graph_msg::msg::Graph::SharedPtr msg) {
     if (msg->nodes.empty()) return;
+    RCLCPP_INFO(nh_->get_logger(), "[GraphMsger] Received decoded_vgraph with %zu nodes",
+                msg->nodes.size());
     NodePtrStack decoded_nodes;
-    // const std::size_t robot_id = msg->robot_id;
     const visibility_graph_msg::msg::Graph graph_msg = *msg;
     IdxMap nodeIdx_idx_map;
+    std::size_t created_count = 0;
     // Create nav nodes for decoded graph
     decoded_nodes.clear();
     for (std::size_t i=0; i<graph_msg.nodes.size(); i++) {
         const auto node = graph_msg.nodes[i];
         const Point3D node_p = Point3D(node.position.x, node.position.y, node.position.z);
         NavNodePtr nearest_node_ptr = NearestNodePtrOnGraph(node_p, gm_params_.dist_margin);
+        // Verify the matched node is still in the current graph (handles reset scenario
+        // where the KdTree/global_graph_ may be stale)
+        if (nearest_node_ptr != NULL) {
+            NavNodePtr verified = DynamicGraph::MappedNavNodeFromId(nearest_node_ptr->id);
+            if (verified == NULL) {
+                nearest_node_ptr = NULL; // Node was removed (e.g. graph reset), treat as no match
+            }
+        }
         if (nearest_node_ptr == NULL || IsMismatchFreeNode(nearest_node_ptr, node)) {
             CreateDecodedNavNode(node, nearest_node_ptr);
             DynamicGraph::AddNodeToGraph(nearest_node_ptr);
+            created_count++;
         }
         decoded_nodes.push_back(nearest_node_ptr);
         nodeIdx_idx_map.insert({node.id, i});
     }
     // Assign connections with fully connection votes
     std::vector<std::size_t> connect_idxs, poly_idxs, contour_idxs, traj_idxs;
+    std::size_t total_contour_in_msg = 0, contour_resolved = 0, contour_added = 0, contour_skipped_null = 0, contour_skipped_cond = 0;
     for (std::size_t i=0; i<graph_msg.nodes.size(); i++) {
         const auto node = graph_msg.nodes[i];
         const NavNodePtr node_ptr = decoded_nodes[i];
         ExtractConnectIdxs(node, connect_idxs, poly_idxs, contour_idxs, traj_idxs);
+        total_contour_in_msg += contour_idxs.size();
         // graph connections
         NavNodePtr cnode_ptr = NULL;
         for (const auto& cid : connect_idxs) {
@@ -136,9 +149,15 @@ void GraphMsger::GraphCallBack(const visibility_graph_msg::msg::Graph::SharedPtr
         // contour connections
         for (const auto& cid : contour_idxs) {
             cnode_ptr = IdToNodePtr(cid, nodeIdx_idx_map, decoded_nodes);
-            if (cnode_ptr != NULL && (!node_ptr->is_active || !cnode_ptr->is_active || (node_ptr->is_boundary && cnode_ptr->is_boundary))) {
+            if (cnode_ptr == NULL) {
+                contour_skipped_null++;
+            } else if (!node_ptr->is_active || !cnode_ptr->is_active || (node_ptr->is_boundary && cnode_ptr->is_boundary)) {
                 DynamicGraph::FillContourConnect(node_ptr, cnode_ptr, gm_params_.votes_size);
+                contour_added++;
+            } else {
+                contour_skipped_cond++;
             }
+            contour_resolved++;
         }
         // trajectory connection
         for (const auto& cid : traj_idxs) {
@@ -148,6 +167,8 @@ void GraphMsger::GraphCallBack(const visibility_graph_msg::msg::Graph::SharedPtr
             }
         }
     }
+    RCLCPP_INFO(nh_->get_logger(), "[GraphMsger] Integrated: %zu decoded, %zu newly created | contour: %zu in msg, %zu resolved, %zu added, %zu skipped(null), %zu skipped(cond)",
+                decoded_nodes.size(), created_count, total_contour_in_msg, contour_resolved, contour_added, contour_skipped_null, contour_skipped_cond);
 }
 
 NavNodePtr GraphMsger::NearestNodePtrOnGraph(const Point3D p, const float radius) {

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAR Planner Web GUI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="logo">🐕 FAR Web GUI</span>
+        <span id="conn-status" class="status disconnected">● Disconnected</span>
+      </div>
+      <div class="topbar-right">
+        <label>Robot IP:
+          <input type="text" id="robot-ip" value="localhost" />
+        </label>
+        <label>WS Port:
+          <input type="number" id="ws-port" value="9090" style="width:65px"/>
+        </label>
+        <label>HTTP Port:
+          <input type="number" id="http-port" value="8080" style="width:65px"/>
+        </label>
+        <button id="btn-connect" class="btn btn-primary">Connect</button>
+      </div>
+    </header>
+
+    <div id="main">
+      <!-- Left panel: Controls -->
+      <aside id="sidebar">
+        <!-- Robot state -->
+        <section class="panel">
+          <h3>Robot State</h3>
+          <div class="field"><span>X:</span> <span id="robot-x">—</span></div>
+          <div class="field"><span>Y:</span> <span id="robot-y">—</span></div>
+          <div class="field"><span>Yaw:</span> <span id="robot-yaw">—</span></div>
+          <div class="field"><span>Goal reached:</span> <span id="goal-status">—</span></div>
+        </section>
+
+        <!-- Planner controls -->
+        <section class="panel">
+          <h3>Planner Controls</h3>
+          <label class="toggle">
+            <input type="checkbox" id="chk-attemptable" checked />
+            Planning Attemptable
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="chk-update-vgraph" checked />
+            Update Visibility Graph
+          </label>
+          <button id="btn-reset-vgraph" class="btn btn-warn">Reset Visibility Graph</button>
+          <button id="btn-resume-nav" class="btn">Resume Navigation to Goal</button>
+        </section>
+
+        <!-- Graph save/load -->
+        <section class="panel">
+          <h3>Graph (VGH)</h3>
+          <button id="btn-download-graph" class="btn btn-primary">Download Graph to PC</button>
+          <div class="file-upload">
+            <label for="file-upload-input" class="btn">Upload Graph from PC</label>
+            <input type="file" id="file-upload-input" accept=".vgh" />
+          </div>
+          <span id="graph-status" class="small-text"></span>
+        </section>
+
+        <!-- Teleop -->
+        <section class="panel">
+          <h3>Teleop</h3>
+          <div id="teleop-container">
+            <canvas id="teleop-stick" width="160" height="160"></canvas>
+          </div>
+          <div class="field small-text">
+            <span>Fwd:</span> <span id="teleop-fwd">0.00</span>
+            <span style="margin-left:8px">Yaw:</span> <span id="teleop-yaw">0.00</span>
+          </div>
+        </section>
+
+        <!-- Map controls -->
+        <section class="panel">
+          <h3>Map View</h3>
+          <button id="btn-center-robot" class="btn">Center on Robot</button>
+          <label class="toggle">
+            <input type="checkbox" id="chk-follow-robot" checked />
+            Follow Robot
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="chk-show-graph" checked />
+            Show VGraph
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="chk-show-path" checked />
+            Show Path
+          </label>
+        </section>
+      </aside>
+
+      <!-- Map canvas -->
+      <div id="map-container">
+        <canvas id="map-canvas"></canvas>
+        <div id="map-info">
+          <span id="map-cursor">Cursor: —</span>
+          <span id="map-zoom">Zoom: 1.0x</span>
+        </div>
+        <div id="goalpoint-hint" class="hidden">Click on map to set goalpoint (right-click to cancel)</div>
+        <button id="btn-set-goal" class="btn btn-goal" title="Set Goalpoint">⊕ Set Goal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- roslibjs from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

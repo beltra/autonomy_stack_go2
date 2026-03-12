@@ -43,7 +43,7 @@ Visualization Manager:
       Namespaces:
         angle_direct: false
         freespace_vertex: false
-        freespace_vgraph: true
+        freespace_vgraph: false
         global_vertex: false
         global_vgraph: false
         polygon_edge: true

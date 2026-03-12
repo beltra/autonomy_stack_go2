@@ -54,7 +54,7 @@ Visualization Manager:
         angle_direct: true
         boundary_edge: true
         freespace_vertex: true
-        freespace_vgraph: true
+        freespace_vgraph: false
         frontier_vertex: true
         global_vertex: true
         global_vgraph: true

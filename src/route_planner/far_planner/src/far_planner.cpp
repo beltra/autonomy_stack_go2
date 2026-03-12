@@ -245,7 +245,7 @@ void FARMaster::MainLoopCallBack() {
   planner_viz_.VizNodes(clear_nodes_, "clear_nodes", VizColor::ORANGE);
   planner_viz_.VizNodes(graph_manager_.GetOutContourNodes(), "out_contour", VizColor::YELLOW);
   planner_viz_.VizPoint3D(FARUtil::free_odom_p, "free_odom_position", VizColor::ORANGE, 1.0);
-  planner_viz_.VizGraph(nav_graph_);
+  planner_viz_.VizGraph(nav_graph_, master_params_.is_viz_freespace);
   planner_viz_.VizContourGraph(ContourGraph::contour_graph_);
   planner_viz_.VizGlobalPolygons(ContourGraph::global_contour_, ContourGraph::unmatched_contour_);
 
@@ -478,6 +478,7 @@ void FARMaster::LoadROSParams() {
   nh_->declare_parameter<bool>("is_pub_boundary", true);
   nh_->declare_parameter<bool>("is_debug_output", false);
   nh_->declare_parameter<bool>("is_attempt_autoswitch", true);
+  nh_->declare_parameter<bool>("is_viz_freespace", false);
   nh_->declare_parameter<std::string>("world_frame", "map");
   
   // Get parameters
@@ -496,6 +497,7 @@ void FARMaster::LoadROSParams() {
   nh_->get_parameter("is_pub_boundary", master_params_.is_pub_boundary);
   nh_->get_parameter("is_debug_output", master_params_.is_debug_output);
   nh_->get_parameter("is_attempt_autoswitch", master_params_.is_attempt_autoswitch);
+  nh_->get_parameter("is_viz_freespace", master_params_.is_viz_freespace);
   nh_->get_parameter<std::string>("world_frame", master_params_.world_frame);
   master_params_.terrain_range = std::min(master_params_.terrain_range, master_params_.sensor_range);
 

@@ -210,7 +210,7 @@ void DPVisualizer::VizContourGraph(const CTNodeStack& contour_graph)
     viz_contour_pub_->publish(contour_marker_array);
 }
 
-void DPVisualizer::VizGraph(const NodePtrStack& graph) {
+void DPVisualizer::VizGraph(const NodePtrStack& graph, const bool viz_freespace) {
     visualization_msgs::msg::MarkerArray graph_marker_array;
     visualization_msgs::msg::Marker nav_node_marker, unfinal_node_marker, near_node_marker, covered_node_marker, internav_node_marker, frontier_node_marker,
            edge_marker, visual_edge_marker, contour_edge_marker, free_edge_marker, odom_edge_marker, goal_edge_marker, traj_edge_marker,
@@ -286,7 +286,7 @@ void DPVisualizer::VizGraph(const NodePtrStack& graph) {
             } else {
                 visual_edge_marker.points.push_back(p1);
                 visual_edge_marker.points.push_back(p2);
-                if (node_ptr->is_covered && cnode->is_covered) {
+                if (viz_freespace && node_ptr->is_covered && cnode->is_covered) {
                     free_edge_marker.points.push_back(p1);
                     free_edge_marker.points.push_back(p2);
                 }
@@ -372,7 +372,9 @@ void DPVisualizer::VizGraph(const NodePtrStack& graph) {
     graph_marker_array.markers.push_back(boundary_node_marker);
     graph_marker_array.markers.push_back(edge_marker);
     graph_marker_array.markers.push_back(visual_edge_marker);
-    graph_marker_array.markers.push_back(free_edge_marker);
+    if (viz_freespace) {
+        graph_marker_array.markers.push_back(free_edge_marker);
+    }
     graph_marker_array.markers.push_back(goal_edge_marker);
     graph_marker_array.markers.push_back(contour_edge_marker);
     graph_marker_array.markers.push_back(boundary_edge_marker);

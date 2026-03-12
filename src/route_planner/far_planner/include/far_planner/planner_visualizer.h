@@ -77,7 +77,7 @@ public:
                     const float scale=1.0f,
                     const float alpha=0.9f);
 
-    void VizGraph(const NodePtrStack& graph);
+    void VizGraph(const NodePtrStack& graph, const bool viz_freespace=true);
 
     void VizPointCloud(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr viz_pub, 
                        const PointCloudPtr& pc);

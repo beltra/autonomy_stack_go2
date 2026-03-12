@@ -29,6 +29,7 @@ struct FARMasterParams {
     bool  is_pub_boundary;
     bool  is_debug_output;
     bool  is_attempt_autoswitch;
+    bool  is_viz_freespace;
     std::string world_frame;
 };
 

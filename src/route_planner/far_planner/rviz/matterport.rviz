@@ -436,7 +436,7 @@ Visualization Manager:
         boundary_edge: false
         boundary_vertex: false
         freespace_vertex: false
-        freespace_vgraph: true
+        freespace_vgraph: false
         frontier_vertex: false
         global_vertex: false
         global_vgraph: false
