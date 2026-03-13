@@ -17,7 +17,7 @@
   <arg name="minDyObsVFOV" default="-16.0"/>
   <arg name="maxDyObsVFOV" default="16.0"/>
   <arg name="minDyObsPointNum" default="1"/>
-  <arg name="noDataObstacle" default="true"/>
+  <arg name="noDataObstacle" default="false"/>
   <arg name="noDataBlockSkipNum" default="2"/>
   <arg name="minBlockPointNum" default="8"/>
   <arg name="maxElevBelowVeh" default="-0.6"/>
