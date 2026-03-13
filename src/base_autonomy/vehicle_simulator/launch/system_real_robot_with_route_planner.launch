@@ -10,6 +10,7 @@
   <arg name="enableClassicWalk" default="true"/>
   <arg name="disableClassicWalkOnExit" default="false"/>
   <arg name="rviz" default="true"/>
+  <arg name="far_mainRunFreq" default="4.0"/>
 
   <node pkg="joy" exec="joy_node" name="ps3_joy" output="screen" >
     <param name="dev" value="/dev/input/js0" />
@@ -17,9 +18,9 @@
     <param name="autorepeat_rate" value="0.0" />
   </node>
   
-  <node pkg="go2_h264_repub" exec="go2_h264_repub" name="go2_h264_repub" output="screen">
+  <!-- <node pkg="go2_h264_repub" exec="go2_h264_repub" name="go2_h264_repub" output="screen">
     <param name="multicast_iface" value="enx3c18a099eeb4"/> 
-  </node>
+  </node> -->
 
   <include file="$(find-pkg-share point_lio_unilidar)/launch/mapping_utlidar.launch">
     <arg name="rviz" value="false"/>
@@ -50,6 +51,7 @@
 
   <include file="$(find-pkg-share far_planner)/launch/far_planner.launch">
     <arg name="rviz" value="$(var rviz)"/>
+    <arg name="main_run_freq" value="$(var far_mainRunFreq)"/>
   </include>
 
   <node launch-prefix="nice" pkg="rviz2" exec="rviz2" name="rvizGA" args="-d $(find-pkg-share vehicle_simulator)/rviz/vehicle_simulator.rviz" if="$(var rviz)"/>

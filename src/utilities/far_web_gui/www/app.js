@@ -57,6 +57,26 @@ let teleopInterval = null;
 // HTTP base (for bridge API)
 let httpBase = '';
 
+// Network profile for congested links:
+// keep robot state responsive, throttle heavy visualization topics,
+// and drop stale queued messages.
+const NET = {
+  odomThrottleMs: 50,
+  goalStatusThrottleMs: 200,
+  graphThrottleMs: 1200,
+  pathThrottleMs: 400,
+  nodeThrottleMs: 1500,
+  queueLength: 1,
+};
+
+function getCurrentHost() {
+  return window.location.hostname || 'localhost';
+}
+
+function getCurrentWsProtocol() {
+  return window.location.protocol === 'https:' ? 'wss' : 'ws';
+}
+
 /* ====================================================================
    INIT
    ==================================================================== */
@@ -96,6 +116,7 @@ window.addEventListener('DOMContentLoaded', () => {
   requestAnimationFrame(renderLoop);
 
   // Try auto-connect with defaults
+  document.getElementById('robot-ip').value = getCurrentHost();
   const params = new URLSearchParams(window.location.search);
   if (params.has('ip')) document.getElementById('robot-ip').value = params.get('ip');
   if (params.has('ws')) document.getElementById('ws-port').value = params.get('ws');
@@ -117,11 +138,17 @@ function toggleConnect() {
 }
 
 function connectRos() {
-  const ip = document.getElementById('robot-ip').value.trim() || 'localhost';
+  if (!window.ROSLIB) {
+    console.error('ROSLIB is unavailable. Check roslib.min.js / roslib_shim.js loading.');
+    setConnStatus(false);
+    return;
+  }
+
+  const ip = document.getElementById('robot-ip').value.trim() || getCurrentHost();
   const wsPort = document.getElementById('ws-port').value.trim() || '9090';
   const httpPort = document.getElementById('http-port').value.trim() || '8080';
   httpBase = `http://${ip}:${httpPort}`;
-  const url = `ws://${ip}:${wsPort}`;
+  const url = `${getCurrentWsProtocol()}://${ip}:${wsPort}`;
 
   ros = new ROSLIB.Ros({ url });
 
@@ -160,22 +187,52 @@ function setConnStatus(ok) {
 
 function setupTopics() {
   // --- Subscribers ---
-  subOdom = new ROSLIB.Topic({ ros, name: '/state_estimation', messageType: 'nav_msgs/Odometry', throttle_rate: 100 });
+  subOdom = new ROSLIB.Topic({
+    ros,
+    name: '/state_estimation',
+    messageType: 'nav_msgs/Odometry',
+    throttle_rate: NET.odomThrottleMs,
+    queue_length: NET.queueLength,
+  });
   subOdom.subscribe(onOdom);
 
-  subGoalStatus = new ROSLIB.Topic({ ros, name: '/far_reach_goal_status', messageType: 'std_msgs/Bool' });
+  subGoalStatus = new ROSLIB.Topic({
+    ros,
+    name: '/far_reach_goal_status',
+    messageType: 'std_msgs/Bool',
+    throttle_rate: NET.goalStatusThrottleMs,
+    queue_length: NET.queueLength,
+  });
   subGoalStatus.subscribe(msg => { goalReached = msg.data; });
 
   // Visualization markers from FAR planner (obstacle edges only)
-  subVizGraph = new ROSLIB.Topic({ ros, name: '/viz_graph_topic', messageType: 'visualization_msgs/MarkerArray', throttle_rate: 500 });
+  subVizGraph = new ROSLIB.Topic({
+    ros,
+    name: '/viz_graph_topic',
+    messageType: 'visualization_msgs/MarkerArray',
+    throttle_rate: NET.graphThrottleMs,
+    queue_length: NET.queueLength,
+  });
   subVizGraph.subscribe(onVizGraph);
 
   // Visualization markers (path)
-  subVizPath = new ROSLIB.Topic({ ros, name: '/viz_path_topic', messageType: 'visualization_msgs/Marker', throttle_rate: 200 });
+  subVizPath = new ROSLIB.Topic({
+    ros,
+    name: '/viz_path_topic',
+    messageType: 'visualization_msgs/Marker',
+    throttle_rate: NET.pathThrottleMs,
+    queue_length: NET.queueLength,
+  });
   subVizPath.subscribe(onVizPath);
 
   // Visualization markers (goalpoint / nodes)
-  subVizNode = new ROSLIB.Topic({ ros, name: '/viz_node_topic', messageType: 'visualization_msgs/MarkerArray', throttle_rate: 500 });
+  subVizNode = new ROSLIB.Topic({
+    ros,
+    name: '/viz_node_topic',
+    messageType: 'visualization_msgs/MarkerArray',
+    throttle_rate: NET.nodeThrottleMs,
+    queue_length: NET.queueLength,
+  });
   subVizNode.subscribe(onVizNode);
 
   // --- Publishers ---

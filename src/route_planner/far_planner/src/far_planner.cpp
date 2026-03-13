@@ -22,11 +22,15 @@ FARMaster::FARMaster()
 }
 
 void FARMaster::Init() {
+  /* Load ROS parameters FIRST so suppress_nonessential_topics is set
+     before conditional publisher/subscriber creation below */
+  this->LoadROSParams();
+
   /* initialize subscriber and publisher */
   reset_graph_sub_    = nh_->create_subscription<std_msgs::msg::Empty>("/reset_visibility_graph", 5, std::bind(&FARMaster::ResetGraphCallBack, this, std::placeholders::_1));
-  odom_sub_           = nh_->create_subscription<nav_msgs::msg::Odometry>("/odom_world", 5, std::bind(&FARMaster::OdomCallBack, this, std::placeholders::_1));
+  odom_sub_           = nh_->create_subscription<nav_msgs::msg::Odometry>("/odom_world", 1, std::bind(&FARMaster::OdomCallBack, this, std::placeholders::_1));
   terrain_sub_        = nh_->create_subscription<sensor_msgs::msg::PointCloud2>("/terrain_cloud", 1, std::bind(&FARMaster::TerrainCallBack, this, std::placeholders::_1));
-  scan_sub_           = nh_->create_subscription<sensor_msgs::msg::PointCloud2>("/scan_cloud", 5, std::bind(&FARMaster::ScanCallBack, this, std::placeholders::_1));
+  scan_sub_           = nh_->create_subscription<sensor_msgs::msg::PointCloud2>("/scan_cloud", 1, std::bind(&FARMaster::ScanCallBack, this, std::placeholders::_1));
   waypoint_sub_       = nh_->create_subscription<geometry_msgs::msg::PointStamped>("/goal_point", 1, std::bind(&FARMaster::WaypointCallBack, this, std::placeholders::_1));
   terrain_local_sub_  = nh_->create_subscription<sensor_msgs::msg::PointCloud2>("/terrain_local_cloud", 1, std::bind(&FARMaster::TerrainLocalCallBack, this, std::placeholders::_1));
   joy_command_sub_    = nh_->create_subscription<sensor_msgs::msg::Joy>("/joy", 5, std::bind(&FARMaster::JoyCommandCallBack, this, std::placeholders::_1));
@@ -35,31 +39,35 @@ void FARMaster::Init() {
   boundary_pub_       = nh_->create_publisher<geometry_msgs::msg::PolygonStamped>("/navigation_boundary",5);
 
   // Timers
-  runtime_pub_        = nh_->create_publisher<std_msgs::msg::Float32>("/runtime",1);
-  planning_time_pub_  = nh_->create_publisher<std_msgs::msg::Float32>("/planning_time",1);
-  traverse_time_pub_  = nh_->create_publisher<std_msgs::msg::Float32>("/far_traverse_time", 5);
+  if (!master_params_.suppress_nonessential_topics) {
+    runtime_pub_        = nh_->create_publisher<std_msgs::msg::Float32>("/runtime",1);
+    planning_time_pub_  = nh_->create_publisher<std_msgs::msg::Float32>("/planning_time",1);
+    traverse_time_pub_  = nh_->create_publisher<std_msgs::msg::Float32>("/far_traverse_time", 5);
+  }
 
   // planning status publisher
   reach_goal_pub_     = nh_->create_publisher<std_msgs::msg::Bool>("/far_reach_goal_status", 5);
 
   // Terminal formatting subscriber
-  read_command_sub_   = nh_->create_subscription<std_msgs::msg::String>("/read_file_dir", 1, std::bind(&FARMaster::ReadFileCommand, this, std::placeholders::_1));
-  save_command_sub_   = nh_->create_subscription<std_msgs::msg::String>("/save_file_dir", 1, std::bind(&FARMaster::SaveFileCommand, this, std::placeholders::_1));
+  if (!master_params_.suppress_nonessential_topics) {
+    read_command_sub_   = nh_->create_subscription<std_msgs::msg::String>("/read_file_dir", 1, std::bind(&FARMaster::ReadFileCommand, this, std::placeholders::_1));
+    save_command_sub_   = nh_->create_subscription<std_msgs::msg::String>("/save_file_dir", 1, std::bind(&FARMaster::SaveFileCommand, this, std::placeholders::_1));
+  }
 
   // DEBUG Publisher
-  dynamic_obs_pub_     = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_dynamic_obs_debug",1);
-  surround_free_debug_ = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_free_debug",1);
-  surround_obs_debug_  = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_obs_debug",1);
-  scan_grid_debug_     = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_scanGrid_debug",1);
-  new_PCL_pub_         = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_new_debug",1);
-  terrain_height_pub_  = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_terrain_height_debug",1);
+  if (!master_params_.suppress_nonessential_topics) {
+    dynamic_obs_pub_     = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_dynamic_obs_debug",1);
+    surround_free_debug_ = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_free_debug",1);
+    surround_obs_debug_  = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_obs_debug",1);
+    scan_grid_debug_     = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_scanGrid_debug",1);
+    new_PCL_pub_         = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_new_debug",1);
+    terrain_height_pub_  = nh_->create_publisher<sensor_msgs::msg::PointCloud2>("/FAR_terrain_height_debug",1);
+  }
 
   //print publisher and subscriber init complete
   // RCLCPP_INFO(nh_->get_logger(), "FAR Planner Subscriber and Publisher Initiated");
 
-  this->LoadROSParams();
-
-  //print ROS params load complete
+  //print ROS params load complete (already called at top of Init)
   RCLCPP_INFO(nh_->get_logger(), "FAR Planner ROS Params Initiated");
 
   /*init path generation thred callback*/
@@ -75,13 +83,16 @@ void FARMaster::Init() {
   graph_manager_.Init(nh_, graph_params_);
   graph_planner_.Init(nh_, gp_params_);
   contour_graph_.Init(nh_, cg_params_);
-  planner_viz_.Init(nh_);
+  planner_viz_.Init(nh_, master_params_.suppress_nonessential_topics);
   map_handler_.Init(map_params_);
   scan_handler_.Init(scan_params_);
   graph_msger_.Init(nh_, msger_parmas_);
 
   //print processing objects init complete
   RCLCPP_INFO(nh_->get_logger(), "FAR Planner Processing Objects Initiated");
+  if (master_params_.suppress_nonessential_topics) {
+    RCLCPP_WARN(nh_->get_logger(), "FAR Planner non-essential topic publication is DISABLED (suppress_nonessential_topics=true)");
+  }
 
   /* init internal params */
   odom_node_ptr_      = NULL;
@@ -222,7 +233,9 @@ void FARMaster::MainLoopCallBack() {
 
   runtimer_.data = FARUtil::Timer.end_time("Total V-Graph Update", is_graph_init_) / 1000.f; // Unit: second
   // runtimer_.data = FARUtil::Timer.end_time("Total V-Graph Update", is_graph_init_); // Unit: ms
-  runtime_pub_->publish(runtimer_);
+  if (runtime_pub_) {
+    runtime_pub_->publish(runtimer_);
+  }
 
   /* Update v-graph in other modules */
   nav_graph_ = graph_manager_.GetNavGraph();
@@ -338,15 +351,19 @@ void FARMaster::PlanningCallBack() {
     auto reach_goal_msg = std_msgs::msg::Bool();
     reach_goal_msg.data = is_reach_goal;
     reach_goal_pub_->publish(reach_goal_msg);
-    auto traverse_timer = std_msgs::msg::Float32();
-    traverse_timer.data = FARUtil::Timer.record_time("Overall_executing");
-    traverse_time_pub_->publish(traverse_timer);
+    if (traverse_time_pub_) {
+      auto traverse_timer = std_msgs::msg::Float32();
+      traverse_timer.data = FARUtil::Timer.record_time("Overall_executing");
+      traverse_time_pub_->publish(traverse_timer);
+    }
     if (is_reach_goal) {
       FARUtil::Timer.end_time("Overall_executing", false);
     }
 
     plan_timer_.data = FARUtil::Timer.end_time("Path Search");
-    planning_time_pub_->publish(plan_timer_);
+    if (planning_time_pub_) {
+      planning_time_pub_->publish(plan_timer_);
+    }
   }
 }
 
@@ -479,6 +496,7 @@ void FARMaster::LoadROSParams() {
   nh_->declare_parameter<bool>("is_debug_output", false);
   nh_->declare_parameter<bool>("is_attempt_autoswitch", true);
   nh_->declare_parameter<bool>("is_viz_freespace", false);
+  nh_->declare_parameter<bool>("suppress_nonessential_topics", true);
   nh_->declare_parameter<std::string>("world_frame", "map");
   
   // Get parameters
@@ -498,6 +516,7 @@ void FARMaster::LoadROSParams() {
   nh_->get_parameter("is_debug_output", master_params_.is_debug_output);
   nh_->get_parameter("is_attempt_autoswitch", master_params_.is_attempt_autoswitch);
   nh_->get_parameter("is_viz_freespace", master_params_.is_viz_freespace);
+  nh_->get_parameter("suppress_nonessential_topics", master_params_.suppress_nonessential_topics);
   nh_->get_parameter<std::string>("world_frame", master_params_.world_frame);
   master_params_.terrain_range = std::min(master_params_.terrain_range, master_params_.sensor_range);
 
@@ -648,7 +667,6 @@ void FARMaster::OdomCallBack(const nav_msgs::msg::Odometry::SharedPtr msg) {
     tf2::Transform odom_to_world_tf_stamp;
     try
     {
-      tf_buffer_->canTransform(master_params_.world_frame, odom_frame, tf2::TimePointZero, std::chrono::seconds(1));
       auto transform_stamped = tf_buffer_->lookupTransform(master_params_.world_frame, odom_frame, tf2::TimePointZero);
       tf2::fromMsg(transform_stamped.transform, odom_to_world_tf_stamp);
       tf_odom_pose = odom_to_world_tf_stamp * tf_odom_pose;
@@ -775,21 +793,23 @@ void FARMaster::TerrainCallBack(const sensor_msgs::msg::PointCloud2::SharedPtr p
 
   if (!FARUtil::surround_obs_cloud_->empty()) is_cloud_init_ = true;
 
-  /* visualize clouds */
-  planner_viz_.VizPointCloud(new_PCL_pub_, FARUtil::stack_new_cloud_);
-  planner_viz_.VizPointCloud(dynamic_obs_pub_, FARUtil::cur_dyobs_cloud_);
-  planner_viz_.VizPointCloud(surround_free_debug_, FARUtil::surround_free_cloud_);
-  planner_viz_.VizPointCloud(surround_obs_debug_,  FARUtil::surround_obs_cloud_);
-  planner_viz_.VizPointCloud(terrain_height_pub_, terrain_height_ptr_);
-  // visualize map grid
-  PointStack neighbor_centers, occupancy_centers;
-  map_handler_.GetNeighborCeilsCenters(neighbor_centers);
-  map_handler_.GetOccupancyCeilsCenters(occupancy_centers);
-  planner_viz_.VizMapGrids(neighbor_centers, occupancy_centers, map_params_.cell_length, map_params_.cell_height);
-  // DBBUG visual raycast grids
-  if (!master_params_.is_static_env) {
-    scan_handler_.GridVisualCloud(scan_grid_ptr_, GridStatus::RAY);
-    planner_viz_.VizPointCloud(scan_grid_debug_, scan_grid_ptr_);
+  if (!master_params_.suppress_nonessential_topics) {
+    /* visualize clouds */
+    planner_viz_.VizPointCloud(new_PCL_pub_, FARUtil::stack_new_cloud_);
+    planner_viz_.VizPointCloud(dynamic_obs_pub_, FARUtil::cur_dyobs_cloud_);
+    planner_viz_.VizPointCloud(surround_free_debug_, FARUtil::surround_free_cloud_);
+    planner_viz_.VizPointCloud(surround_obs_debug_,  FARUtil::surround_obs_cloud_);
+    planner_viz_.VizPointCloud(terrain_height_pub_, terrain_height_ptr_);
+    // visualize map grid
+    PointStack neighbor_centers, occupancy_centers;
+    map_handler_.GetNeighborCeilsCenters(neighbor_centers);
+    map_handler_.GetOccupancyCeilsCenters(occupancy_centers);
+    planner_viz_.VizMapGrids(neighbor_centers, occupancy_centers, map_params_.cell_length, map_params_.cell_height);
+    // DBBUG visual raycast grids
+    if (!master_params_.is_static_env) {
+      scan_handler_.GridVisualCloud(scan_grid_ptr_, GridStatus::RAY);
+      planner_viz_.VizPointCloud(scan_grid_debug_, scan_grid_ptr_);
+    }
   }
 }
 

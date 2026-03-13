@@ -16,7 +16,7 @@
       </div>
       <div class="topbar-right">
         <label>Robot IP:
-          <input type="text" id="robot-ip" value="localhost" />
+          <input type="text" id="robot-ip" value="" placeholder="Current host" />
         </label>
         <label>WS Port:
           <input type="number" id="ws-port" value="9090" style="width:65px"/>
@@ -110,8 +110,8 @@
     </div>
   </div>
 
-  <!-- roslibjs from CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+  <!-- Local ROSLIB-compatible implementation (works offline in AP mode) -->
+  <script src="roslib_shim.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

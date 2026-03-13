@@ -11,17 +11,19 @@
 /***************************************************************************************/
 
 
-void DPVisualizer::Init(const rclcpp::Node::SharedPtr nh) {
+void DPVisualizer::Init(const rclcpp::Node::SharedPtr nh, const bool suppress_nonessential_topics) {
     nh_ = nh;
     point_cloud_ptr_ = PointCloudPtr(new pcl::PointCloud<PCLPoint>());
     // Rviz Publisher
     viz_path_pub_    = nh_->create_publisher<visualization_msgs::msg::Marker>("/viz_path_topic", 5);
     viz_node_pub_    = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_node_topic", 5);
-    viz_poly_pub_    = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_poly_topic", 5);
     viz_graph_pub_   = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_graph_topic", 5);
-    viz_contour_pub_ = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_contour_topic", 5);
-    viz_map_pub_     = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_grid_map_topic", 5);
-    viz_view_extend  = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_viewpoint_extend_topic", 5);
+    if (!suppress_nonessential_topics) {
+        viz_poly_pub_    = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_poly_topic", 5);
+        viz_contour_pub_ = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_contour_topic", 5);
+        viz_map_pub_     = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_grid_map_topic", 5);
+        viz_view_extend  = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("/viz_viewpoint_extend_topic", 5);
+    }
     // init marker set
     marker_set_.clear();
 }
@@ -62,6 +64,7 @@ void DPVisualizer::VizPoint3D(const Point3D& point,
 }
 
 void DPVisualizer::VizPath(const NodePtrStack& global_path, const bool& is_free_nav) {
+    if (!viz_path_pub_) return;
     Marker path_marker;
     path_marker.type = Marker::LINE_STRIP;
     const VizColor color = is_free_nav ? VizColor::GREEN : VizColor::BLUE;
@@ -75,6 +78,7 @@ void DPVisualizer::VizPath(const NodePtrStack& global_path, const bool& is_free_
 }
 
 void DPVisualizer::VizViewpointExtend(const NavNodePtr& ori_nav_ptr, const Point3D& extend_point) {
+    if (!viz_view_extend) return;
     MarkerArray view_extend_marker_array;
     Marker corner_direct_marker, ray_tracing_marker, origin_p_marker, extend_p_marker;
     corner_direct_marker.type = Marker::LINE_LIST;
@@ -116,6 +120,7 @@ void DPVisualizer::VizViewpointExtend(const NavNodePtr& ori_nav_ptr, const Point
 }
 
 void DPVisualizer::VizGlobalPolygons(const std::vector<PointPair>& contour_pairs, const std::vector<PointPair>& unmatched_pairs) {
+    if (!viz_poly_pub_) return;
     MarkerArray poly_marker_array;
     Marker global_contour_marker, unmatched_contour_marker;
     global_contour_marker.type    = Marker::LINE_LIST;
@@ -141,6 +146,7 @@ void DPVisualizer::VizGlobalPolygons(const std::vector<PointPair>& contour_pairs
 
 void DPVisualizer::VizContourGraph(const CTNodeStack& contour_graph) 
 {
+    if (!viz_contour_pub_) return;
     MarkerArray contour_marker_array;
     Marker contour_vertex_marker, vertex_matched_marker, necessary_vertex_marker;
     Marker contour_marker, contour_surf_marker, contour_helper_marker;
@@ -211,6 +217,7 @@ void DPVisualizer::VizContourGraph(const CTNodeStack& contour_graph)
 }
 
 void DPVisualizer::VizGraph(const NodePtrStack& graph, const bool viz_freespace) {
+    if (!viz_graph_pub_) return;
     visualization_msgs::msg::MarkerArray graph_marker_array;
     visualization_msgs::msg::Marker nav_node_marker, unfinal_node_marker, near_node_marker, covered_node_marker, internav_node_marker, frontier_node_marker,
            edge_marker, visual_edge_marker, contour_edge_marker, free_edge_marker, odom_edge_marker, goal_edge_marker, traj_edge_marker,
@@ -389,6 +396,7 @@ void DPVisualizer::VizGraph(const NodePtrStack& graph, const bool viz_freespace)
 void DPVisualizer::VizMapGrids(const PointStack& neighbor_centers, const PointStack& occupancy_centers,
                                const float& ceil_length, const float& ceil_height)
 {
+    if (!viz_map_pub_) return;
     visualization_msgs::msg::MarkerArray map_grid_marker_array;
     visualization_msgs::msg::Marker neighbor_marker, occupancy_marker;
     neighbor_marker.type = visualization_msgs::msg::Marker::CUBE_LIST;
@@ -440,6 +448,7 @@ void DPVisualizer::SetMarker(const rclcpp::Node::SharedPtr nh,
 void DPVisualizer::VizPointCloud(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr viz_pub, 
                                  const PointCloudPtr& pc) 
 {
+    if (!viz_pub) return;
     sensor_msgs::msg::PointCloud2 msg_pc;
     pcl::toROSMsg(*pc, msg_pc);
     msg_pc.header.frame_id = FARUtil::worldFrameId;

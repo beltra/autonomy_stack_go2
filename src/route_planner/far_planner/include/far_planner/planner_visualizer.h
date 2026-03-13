@@ -48,7 +48,7 @@ public:
     DPVisualizer() = default;
     ~DPVisualizer() = default;
 
-    void Init(const rclcpp::Node::SharedPtr nh);
+    void Init(const rclcpp::Node::SharedPtr nh, const bool suppress_nonessential_topics=false);
 
     void VizNodes(const NodePtrStack& node_stack, 
                   const std::string& ns,
@@ -83,6 +83,7 @@ public:
                        const PointCloudPtr& pc);
 
     inline void PubNodesVisualization() {
+        if (!viz_node_pub_) return;
         MarkerArray marker_array;
         for (auto& marker : marker_set_) {
             marker_array.markers.push_back(marker);

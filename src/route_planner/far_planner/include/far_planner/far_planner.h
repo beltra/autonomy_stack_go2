@@ -30,6 +30,7 @@ struct FARMasterParams {
     bool  is_debug_output;
     bool  is_attempt_autoswitch;
     bool  is_viz_freespace;
+    bool  suppress_nonessential_topics = true;
     std::string world_frame;
 };
 

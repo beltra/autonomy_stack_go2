@@ -287,7 +287,7 @@ int main(int argc, char** argv)
   nh->get_parameter("enableClassicWalk", enableClassicWalk);
   nh->get_parameter("disableClassicWalkOnExit", disableClassicWalkOnExit);
 
-  auto subOdom = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 5, odomHandler);
+  auto subOdom = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 1, odomHandler);
 
   auto subPath = nh->create_subscription<nav_msgs::msg::Path>("/path", 5, pathHandler);
 

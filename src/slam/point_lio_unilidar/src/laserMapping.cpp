@@ -350,6 +350,14 @@ void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
         lidar_buffer.emplace_back(ptr);
         time_buffer.emplace_back(get_time_in_sec(msg->header.stamp));
     }
+    // Drop oldest scans if SLAM is falling behind to keep latency low
+    constexpr int kMaxLidarBuffer = 10;
+    while ((int)lidar_buffer.size() > kMaxLidarBuffer) {
+        lidar_buffer.pop_front();
+        time_buffer.pop_front();
+        // printf("[SLAM] lidar_buffer overflow: dropped oldest scan to reduce latency\n");
+    }
+
     s_plot11[scan_count] = omp_get_wtime() - preprocess_start_time;
     mtx_buffer.unlock();
     sig_buffer.notify_all();
@@ -912,9 +920,9 @@ int main(int argc, char **argv)
 
     /*** ROS subscribe initialization ***/
     
-    auto sub_pcl = node->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 2000, standard_pcl_cbk);
+    auto sub_pcl = node->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 10, standard_pcl_cbk);
 
-    auto sub_imu = node->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 2000, imu_cbk);
+    auto sub_imu = node->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 200, imu_cbk);
 
     auto pubLaserCloudFullRes = node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 1000);
 

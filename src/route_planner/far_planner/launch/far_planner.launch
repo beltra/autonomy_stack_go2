@@ -4,6 +4,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node, SetParameter
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 from launch.substitutions import PythonExpression
 import launch.conditions
@@ -15,6 +16,12 @@ def generate_launch_description():
         SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time')),
         DeclareLaunchArgument('config', default_value='default'),
         DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('main_run_freq', default_value='3.0'),
+        DeclareLaunchArgument(
+            'suppress_nonessential_topics',
+            default_value='true',
+            description='If true, disables publication of non-essential debug/diagnostic visualization topics to reduce network load.'
+        ),
 
         Node(
             package='far_planner',
@@ -27,7 +34,11 @@ def generate_launch_description():
                 get_package_share_directory('far_planner'), 
                 '/config/', 
                 LaunchConfiguration('config'), 
-                '.yaml"'])
+                '.yaml"']),
+                {
+                    'main_run_freq': ParameterValue(LaunchConfiguration('main_run_freq'), value_type=float),
+                    'suppress_nonessential_topics': ParameterValue(LaunchConfiguration('suppress_nonessential_topics'), value_type=bool)
+                }
             ],
             remappings=[
                 ('/odom_world', '/state_estimation'),
