@@ -22,13 +22,13 @@
             lidar_type: 5
             scan_line: 18
             timestamp_unit: 0           # the unit of time/t field in the PointCloud2 rostopic: 0-second, 1-milisecond, 2-microsecond, 3-nanosecond.
-            blind: 0.1
+            blind: 0.3
 
         mapping:
             imu_en: true
             start_in_aggressive_motion: false # if true, a preknown gravity should be provided in following gravity_init
             extrinsic_est_en: false # for aggressive motion, set this variable false
-            imu_time_inte: 0.004 # = 1 / frequency of IMU
+            imu_time_inte: 0.01 # = 1 / frequency of IMU
             satu_acc: 30.0 # the saturation value of IMU's acceleration. not related to the units
             satu_gyro: 35.0 # the saturation value of IMU's angular velocity. not related to the units
             acc_norm: 9.81 # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
@@ -44,7 +44,7 @@
             plane_thr: 0.1 # 0.05, the threshold for plane criteria, the smaller, the flatter a plane
             match_s: 81.0
             fov_degree: 180.0 
-            det_range: 50.0
+            det_range: 80.0
             gravity_align: false # true to align the z axis of world frame with the direction of gravity, and the gravity direction should be specified below
             gravity: [0.0, 0.0, 0.0] # [0.0, 9.810, 0.0] # gravity to be aligned
             gravity_init: [0.0, 0.0, 0.0] # [0.0, 9.810, 0.0] # # preknown gravity in the first IMU body frame, use when imu_en is false or start from a non-stationary state
