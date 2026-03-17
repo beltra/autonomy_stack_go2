@@ -86,6 +86,9 @@ float joyManualFwd = 0;
 float joyManualLeft = 0;
 float joyManualYaw = 0;
 int safetyStop = 0;
+bool isSafetyShutdown = false;
+bool hasSentStandDown = false;
+double joyTimeoutSec = 0.5;
 
 float vehicleX = 0;
 float vehicleY = 0;
@@ -115,6 +118,7 @@ double switchTime = 0;
 
 nav_msgs::msg::Path path;
 rclcpp::Node::SharedPtr nh;
+rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr pubGo2Request;
 
 unitree_api::msg::Request req;
 SportClient sport_req;
@@ -193,6 +197,25 @@ void joystickHandler(const sensor_msgs::msg::Joy::ConstSharedPtr joy)
     manualMode = false;
   } else {
     manualMode = true;
+  }
+
+  // Safety shutdown (buttons[8]) — triggered by Web GUI emergency button
+  if (joy->buttons.size() > 8 && joy->buttons[8] == 1) {
+    isSafetyShutdown = true;
+    RCLCPP_ERROR(nh->get_logger(), "EMERGENCY SHUTDOWN triggered from Web GUI! Sending StandDown.");
+  }
+
+  // Reboot command (buttons[9]) — triggered by Web GUI reboot button
+  if (joy->buttons.size() > 9 && joy->buttons[9] == 1) {
+    if (isSafetyShutdown) {
+      isSafetyShutdown = false;
+      hasSentStandDown = false;
+      RCLCPP_INFO(nh->get_logger(), "REBOOT triggered from Web GUI! Sending StandUp and clearing goals.");
+      if (is_real_robot) {
+        sport_req.StandUp(req);
+        pubGo2Request->publish(req);
+      }
+    }
   }
 }
 
@@ -299,7 +322,7 @@ int main(int argc, char** argv)
 
   auto pubSpeed = nh->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 5);
 
-  auto pubGo2Request = nh->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
+  pubGo2Request = nh->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
 
   geometry_msgs::msg::TwistStamped cmd_vel;
   cmd_vel.header.frame_id = "vehicle";
@@ -359,7 +382,56 @@ int main(int argc, char** argv)
   while (status) {
     rclcpp::spin_some(nh);
 
-    if (pathInit) {
+    double currentTime = nh->now().seconds();
+
+    // === PRIORITY 1: Safety shutdown (emergency stop) ===
+    if (isSafetyShutdown) {
+      if (is_real_robot && !hasSentStandDown) {
+        sport_req.StopMove(req);
+        pubGo2Request->publish(req);
+        rclcpp::sleep_for(std::chrono::milliseconds(100)); // Short delay
+        sport_req.StandDown(req);
+        pubGo2Request->publish(req);
+        RCLCPP_ERROR(nh->get_logger(), "EMERGENCY SHUTDOWN: Sending StandDown command...");
+        hasSentStandDown = true;
+      }
+      cmd_vel.twist.linear.x = 0;
+      cmd_vel.twist.linear.y = 0;
+      cmd_vel.twist.angular.z = 0;
+      pubSpeed->publish(cmd_vel);
+      rate.sleep();
+      status = rclcpp::ok();
+      continue;
+    }
+
+    // === Timeout: auto-disable manual mode if no joy msg in 0.5s ===
+    if (manualMode && (currentTime - joyTime > joyTimeoutSec)) {
+      manualMode = false;
+      joyManualFwd = 0;
+      joyManualLeft = 0;
+      joyManualYaw = 0;
+      RCLCPP_WARN(nh->get_logger(), "Web GUI joystick timeout — resuming planner control.");
+    }
+
+    // === PRIORITY 2: Web GUI manual teleop (overrides planner) ===
+    if (manualMode) {
+      cmd_vel.header.stamp = nh->now();
+      cmd_vel.twist.linear.x = maxSpeed * joyManualFwd;
+      cmd_vel.twist.linear.y = maxSpeed / 2.0 * joyManualLeft;
+      cmd_vel.twist.angular.z = maxYawRate * PI / 180.0 * joyManualYaw;
+      pubSpeed->publish(cmd_vel);
+
+      if (is_real_robot) {
+        if (cmd_vel.twist.linear.x == 0 && cmd_vel.twist.linear.y == 0 && cmd_vel.twist.angular.z == 0) {
+          sport_req.StopMove(req);
+        } else {
+          sport_req.Move(req, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
+        }
+        pubGo2Request->publish(req);
+      }
+    }
+    // === PRIORITY 3: Autonomous planner path following ===
+    else if (pathInit) {
       float vehicleXRel = cos(vehicleYawRec) * (vehicleX - vehicleXRec) 
                         + sin(vehicleYawRec) * (vehicleY - vehicleYRec);
       float vehicleYRel = -sin(vehicleYawRec) * (vehicleX - vehicleXRec) 
@@ -466,11 +538,6 @@ int main(int argc, char** argv)
         }
         cmd_vel.twist.angular.z = vehicleYawRate;
         
-        if (manualMode) {
-          cmd_vel.twist.linear.x = maxSpeed * joyManualFwd;
-          cmd_vel.twist.linear.y = maxSpeed / 2.0 * joyManualLeft;
-          cmd_vel.twist.angular.z = maxYawRate * PI / 180.0 * joyManualYaw;
-        }
 
         pubSpeed->publish(cmd_vel);
 

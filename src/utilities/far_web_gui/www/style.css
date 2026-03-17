@@ -31,6 +31,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .btn-primary:hover { background: #53d8fb; color: #111; }
 .btn-warn { background: #c0392b; color: #fff; }
 .btn-warn:hover { background: #e74c3c; }
+.btn-danger { background: #c0392b; color: #fff; font-weight: 700; font-size: 1em; padding: 12px 14px; letter-spacing: 1px; border: 2px solid #e74c3c; animation: pulse-danger 1.5s infinite; }
+.btn-danger:hover { background: #e74c3c; }
+.btn-danger.triggered { animation: none; background: #7f1d1d; border-color: #991b1b; cursor: default; }
+.panel-danger { border: 1px solid #c0392b; }
+@keyframes pulse-danger { 0%, 100% { box-shadow: 0 0 4px rgba(231,76,60,0.4); } 50% { box-shadow: 0 0 16px rgba(231,76,60,0.8); } }
 .btn-goal { position: absolute; bottom: 16px; right: 16px; width: auto; padding: 10px 18px; font-size: 1em; background: #27ae60; color: #fff; border-radius: 8px; z-index: 10; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
 .btn-goal:hover { background: #2ecc71; }
 .btn-goal.active { background: #e67e22; }

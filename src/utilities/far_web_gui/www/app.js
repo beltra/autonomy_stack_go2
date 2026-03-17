@@ -100,6 +100,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('chk-show-path').addEventListener('change', e => { showPath = e.target.checked; });
   document.getElementById('chk-attemptable').addEventListener('change', publishAttemptable);
   document.getElementById('chk-update-vgraph').addEventListener('change', publishUpdateVGraph);
+  document.getElementById('btn-safety-shutdown').addEventListener('click', safetyShutdown);
+  document.getElementById('btn-reboot').addEventListener('click', rebootRobot);
 
   // Map interactions
   canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -248,7 +250,7 @@ function setupTopics() {
 }
 
 function cleanupTopics() {
-  [subOdom, subGoalStatus, subVizGraph, subVizPath, subVizNode].forEach(s => { if (s) try { s.unsubscribe(); } catch(e){} });
+  [subOdom, subGoalStatus, subVizGraph, subVizPath, subVizNode].forEach(s => { if (s) try { s.unsubscribe(); } catch (e) { } });
   subOdom = subGoalStatus = subVizGraph = subVizPath = subVizNode = null;
   pubGoalPoint = pubJoy = pubAttemptable = pubUpdateVGraph = pubResetVGraph = pubUploadGraph = null;
   srvDownloadGraph = null;
@@ -283,16 +285,24 @@ function onOdom(msg) {
 function onVizGraph(msg) {
   // Only keep obstacle (polygon_edge) and boundary edges — skip freespace_vgraph (light blue)
   const edges = [];
+  let foundValidEdges = false;
   for (const marker of msg.markers) {
     const ns = marker.ns;
     if (marker.type !== 5) continue;  // LINE_LIST only
     if (ns !== 'polygon_edge' && ns !== 'boundary_edge') continue;
+    
+    foundValidEdges = true;
+    if (!marker.points || marker.points.length === 0) continue;
+
     for (let i = 0; i + 1 < marker.points.length; i += 2) {
       const a = marker.points[i], b = marker.points[i + 1];
       edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, ns });
     }
   }
-  graphEdges = edges;
+  
+  if (foundValidEdges) {
+    graphEdges = edges;
+  }
 }
 
 function onVizPath(msg) {
@@ -303,7 +313,7 @@ function onVizNode(msg) {
   const markers = [];
   for (const marker of msg.markers) {
     const pts = marker.points && marker.points.length ? marker.points :
-                [marker.pose ? marker.pose.position : null];
+      [marker.pose ? marker.pose.position : null];
     for (const pt of pts) {
       if (!pt) continue;
       markers.push({ x: pt.x, y: pt.y, ns: marker.ns });
@@ -656,6 +666,93 @@ function setGraphStatus(text) {
 }
 
 /* ====================================================================
+   SAFETY SHUTDOWN
+   ==================================================================== */
+
+let shutdownTriggered = false;
+
+function safetyShutdown() {
+  if (shutdownTriggered) return;
+  if (!pubJoy || !connected) {
+    document.getElementById('shutdown-status').textContent = 'Not connected!';
+    return;
+  }
+
+  shutdownTriggered = true;
+  console.error('EMERGENCY SHUTDOWN triggered!');
+
+  // Stop any active teleop
+  teleopActive = false;
+  teleopFwd = 0;
+  teleopYaw = 0;
+  if (teleopInterval) {
+    clearInterval(teleopInterval);
+    teleopInterval = null;
+  }
+
+  // Send shutdown joy message (buttons[8] = 1) multiple times for redundancy
+  const shutdownMsg = new ROSLIB.Message({
+    header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'web_gui_emergency' },
+    axes: [0, 0, -1.0, 0, 0, 1.0, 0, 0],
+    buttons: [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0]
+  });
+
+  // Publish 5 times at 50ms intervals for network reliability
+  let count = 0;
+  const sendInterval = setInterval(() => {
+    pubJoy.publish(shutdownMsg);
+    count++;
+    if (count >= 5) {
+      clearInterval(sendInterval);
+    }
+  }, 50);
+
+  // Update UI
+  const btn = document.getElementById('btn-safety-shutdown');
+  btn.textContent = 'SHUTDOWN SENT';
+  btn.classList.add('triggered');
+  document.getElementById('shutdown-status').textContent = 'Robot is shutting down (StandDown)...';
+
+  // Expose the reboot button
+  document.getElementById('btn-reboot').classList.remove('hidden');
+}
+
+function rebootRobot() {
+  if (!shutdownTriggered) return;
+  if (!pubJoy || !pubGoalPoint || !connected) {
+    document.getElementById('shutdown-status').textContent = 'Not connected!';
+    return;
+  }
+
+  console.log('REBOOT triggered!');
+
+  // Send reboot joy message (buttons[9] = 1)
+  const rebootMsg = new ROSLIB.Message({
+    header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'web_gui_emergency' },
+    axes: [0, 0, -1.0, 0, 0, 1.0, 0, 0],
+    buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
+  });
+  pubJoy.publish(rebootMsg);
+
+  // // Send an empty point to clear planner goals
+  // const emptyGoalMsg = new ROSLIB.Message({
+  //   header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'map' },
+  //   point: { x: robotState.x, y: robotState.y, z: robotState.z }
+  // });
+  // pubGoalPoint.publish(emptyGoalMsg);
+
+  // Update UI state
+  shutdownTriggered = false;
+  const btn = document.getElementById('btn-safety-shutdown');
+  btn.textContent = 'EMERGENCY SHUTDOWN';
+  btn.classList.remove('triggered');
+  document.getElementById('shutdown-status').textContent = '';
+  document.getElementById('btn-reboot').classList.add('hidden');
+}
+
+
+
+/* ====================================================================
    TELEOP (virtual joystick)
    ==================================================================== */
 
@@ -731,6 +828,7 @@ function initTeleopStick() {
   }
 
   function stopDrag() {
+    if (!dragging) return;
     dragging = false;
     teleopActive = false;
     stickX = 0; stickY = 0;

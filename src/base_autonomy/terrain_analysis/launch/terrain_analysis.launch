@@ -10,7 +10,7 @@
   <arg name="limitGroundLift" default="false"/>
   <arg name="maxGroundLift" default="0.10"/>
   <arg name="clearDyObs" default="false"/>
-  <arg name="minDyObsDis" default="0.3"/>
+  <arg name="minDyObsDis" default="0.2"/>
   <arg name="minDyObsAngle" default="0.0"/>
   <arg name="minDyObsRelZ" default="-0.3"/>
   <arg name="absDyObsRelZThre" default="0.2"/>
