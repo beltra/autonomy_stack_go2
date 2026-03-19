@@ -58,6 +58,7 @@ let goalMode = false;
 let teleopFwd = 0, teleopYaw = 0;
 let teleopActive = false;
 let teleopInterval = null;
+let teleopSpeedScale = 0.5; // 0.1–1.0, default half-speed for safety
 
 // Render scheduling
 let renderDirty = true;
@@ -125,6 +126,26 @@ window.addEventListener('DOMContentLoaded', () => {
   // Teleop stick
   initTeleopStick();
 
+  // Speed scale slider
+  const speedSlider = document.getElementById('teleop-speed-scale');
+  const speedLabel = document.getElementById('teleop-speed-label');
+  if (speedSlider) {
+    speedSlider.addEventListener('input', e => {
+      teleopSpeedScale = parseFloat(e.target.value);
+      if (speedLabel) speedLabel.textContent = (teleopSpeedScale * 100).toFixed(0) + '%';
+    });
+    teleopSpeedScale = parseFloat(speedSlider.value);
+    if (speedLabel) speedLabel.textContent = (teleopSpeedScale * 100).toFixed(0) + '%';
+  }
+
+  // Auto-stop teleop when user switches tabs or window loses focus
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && teleopActive) stopTeleop('Tab hidden — teleop stopped.');
+  });
+  window.addEventListener('blur', () => {
+    if (teleopActive) stopTeleop('Window blurred — teleop stopped.');
+  });
+
   // Render loop
   requestAnimationFrame(renderLoop);
 
@@ -137,8 +158,14 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function resizeCanvas() {
-  canvas.width = canvas.parentElement.clientWidth;
-  canvas.height = canvas.parentElement.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = canvas.parentElement.clientHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   markRenderDirty();
 }
 
@@ -250,10 +277,10 @@ function setupTopics() {
   });
   subGoalStatus.subscribe(msg => { goalReached = msg.data; });
 
-  // Visualization markers from FAR planner (obstacle edges only)
+  // Visualization markers — prefer server-filtered topic for lower bandwidth
   subVizGraph = new ROSLIB.Topic({
     ros,
-    name: '/viz_graph_topic',
+    name: '/viz_graph_topic_filtered',
     messageType: 'visualization_msgs/MarkerArray',
     throttle_rate: NET.graphThrottleMs,
     queue_length: NET.queueLength,
@@ -327,15 +354,12 @@ function onOdom(msg) {
    ==================================================================== */
 
 function onVizGraph(msg) {
-  // Only keep obstacle (polygon_edge) and boundary edges — skip freespace_vgraph (light blue)
+  // Parse obstacle (polygon_edge) and boundary edges from filtered topic
   const edges = [];
-  let foundValidEdges = false;
   for (const marker of msg.markers) {
     const ns = marker.ns;
     if (marker.type !== 5) continue;  // LINE_LIST only
     if (ns !== 'polygon_edge' && ns !== 'boundary_edge') continue;
-    
-    foundValidEdges = true;
     if (!marker.points || marker.points.length === 0) continue;
 
     for (let i = 0; i + 1 < marker.points.length; i += 2) {
@@ -343,16 +367,21 @@ function onVizGraph(msg) {
       edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, ns });
     }
   }
-  
-  if (foundValidEdges || graphEdges.length > 0) {
+  // Only update if we received actual edge data; keep stale data visible
+  // when the planner publishes empty updates (e.g., robot stationary).
+  if (edges.length > 0) {
     graphEdges = edges;
     markRenderDirty();
   }
 }
 
 function onVizPath(msg) {
-  globalPath = (msg.points || []).map(p => ({ x: p.x, y: p.y }));
-  markRenderDirty();
+  const newPath = (msg.points || []).map(p => ({ x: p.x, y: p.y }));
+  // Only replace if new path has content; keep last valid path visible.
+  if (newPath.length > 0) {
+    globalPath = newPath;
+    markRenderDirty();
+  }
 }
 
 function onVizNode(msg) {
@@ -365,8 +394,11 @@ function onVizNode(msg) {
       markers.push({ x: pt.x, y: pt.y, ns: marker.ns });
     }
   }
-  vizGoalMarkers = markers;
-  markRenderDirty();
+  // Only replace if we received actual markers; keep stale goal visible.
+  if (markers.length > 0) {
+    vizGoalMarkers = markers;
+    markRenderDirty();
+  }
 }
 
 /* ====================================================================
@@ -452,35 +484,45 @@ function markRenderDirty() {
 }
 
 function render() {
-  const W = canvas.width, H = canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr, H = canvas.height / dpr;
   ctx.clearRect(0, 0, W, H);
 
   // Follow robot
   if (followRobot && connected) {
-    view.cx += (robotState.x - view.cx) * 0.1;
-    view.cy += (robotState.y - view.cy) * 0.1;
+    view.cx += (robotState.x - view.cx) * 0.25;
+    view.cy += (robotState.y - view.cy) * 0.25;
   }
 
   // Draw grid
   drawGrid();
 
-  // Draw obstacle edges
+  // Draw obstacle edges — batched by type for performance
   if (showGraph && graphEdges.length) {
+    // Polygon edges (red)
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
+    ctx.lineWidth = 1.5;
     for (const e of graphEdges) {
+      if (e.ns === 'boundary_edge') continue;
       const [x1, y1] = worldToScreen(e.x1, e.y1);
       const [x2, y2] = worldToScreen(e.x2, e.y2);
-      ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
-      if (e.ns === 'boundary_edge') {
-        ctx.strokeStyle = 'rgba(255, 165, 0, 0.6)';
-        ctx.lineWidth = 1.5;
-      } else {
-        ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
-        ctx.lineWidth = 1.5;
-      }
-      ctx.stroke();
     }
+    ctx.stroke();
+    // Boundary edges (orange)
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 165, 0, 0.6)';
+    ctx.lineWidth = 1.5;
+    for (const e of graphEdges) {
+      if (e.ns !== 'boundary_edge') continue;
+      const [x1, y1] = worldToScreen(e.x1, e.y1);
+      const [x2, y2] = worldToScreen(e.x2, e.y2);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
   }
 
   // Draw global path
@@ -934,9 +976,12 @@ function sendTeleopJoy() {
   //         = 1.0  when stick released → manual mode OFF (back to normal)
   // buttons[7] = 1 (teleop panel flag)
   const manualTrigger = teleopActive ? -1.0 : 1.0;
+  // Apply speed scale for safer manual control
+  const scaledFwd = teleopFwd * teleopSpeedScale;
+  const scaledYaw = -teleopYaw * teleopSpeedScale;
   const msg = new ROSLIB.Message({
     header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'teleop_panel' },
-    axes: [-teleopYaw, 0, 1.0, 0, teleopFwd, manualTrigger, 0, 0],
+    axes: [scaledYaw, 0, 1.0, 0, scaledFwd, manualTrigger, 0, 0],
     buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
   });
   safePublish(pubJoy, msg);

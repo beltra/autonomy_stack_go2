@@ -79,6 +79,13 @@
             <span>Fwd:</span> <span id="teleop-fwd">0.00</span>
             <span style="margin-left:8px">Yaw:</span> <span id="teleop-yaw">0.00</span>
           </div>
+          <div class="field small-text" style="flex-direction:column;gap:4px;margin-top:6px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span>Speed:</span>
+              <input type="range" id="teleop-speed-scale" min="0.1" max="1.0" step="0.05" value="0.5" style="flex:1;accent-color:#53d8fb" />
+              <span id="teleop-speed-label" style="min-width:32px;text-align:right">50%</span>
+            </div>
+          </div>
         </section>
 
         <!-- Map controls -->
@@ -113,7 +120,14 @@
     </div>
   </div>
 
-  <!-- Local ROSLIB-compatible implementation (works offline in AP mode) -->
+  <!-- Official roslibjs from CDN (when internet is available).
+       If this loads, the local shim will detect ROSLIB and skip itself. -->
+  <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"
+          crossorigin="anonymous"
+          onerror="console.info('CDN roslib unavailable \u2014 using local version.')"></script>
+  <!-- <script src="roslib.min.js"
+          onerror="console.info('Local roslib unavailable \u2014 using local shim.')"></script> -->
+  <!-- Local ROSLIB-compatible shim (works offline in AP mode) -->
   <script src="roslib_shim.js"></script>
   <script src="app.js"></script>
 </body>

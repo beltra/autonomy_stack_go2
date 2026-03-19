@@ -238,6 +238,9 @@ void joystickHandler(const sensor_msgs::msg::Joy::ConstSharedPtr joy)
       if (is_real_robot) {
         sport_req.StandUp(req);
         pubGo2Request->publish(req);
+        rclcpp::sleep_for(std::chrono::seconds(1)); // Wait for the robot to stand up before accepting new commands
+        sport_req.ClassicWalk(req, true);
+        pubGo2Request->publish(req);
       }
     }
   }

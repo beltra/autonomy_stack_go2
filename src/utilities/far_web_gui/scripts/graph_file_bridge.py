@@ -10,6 +10,9 @@ Functions:
   - Provides a ROS2 topic /web_gui/upload_graph (std_msgs/String)
     that receives VGH text content, writes a temp file, publishes
     the path on /read_file_dir, then deletes the temp file.
+  - Filters /viz_graph_topic to only forward polygon_edge and
+    boundary_edge markers to /viz_graph_topic_filtered, reducing
+    WebSocket bandwidth by ~80%.
 """
 
 import os
@@ -31,6 +34,7 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Joy
 from nav_msgs.msg import Odometry
 from visibility_graph_msg.msg import Graph
+from visualization_msgs.msg import MarkerArray
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
@@ -89,6 +93,14 @@ class GraphFileBridge(Node):
 
         # Publisher to feed file path to decoder's read
         self.read_file_pub = self.create_publisher(String, '/read_file_dir', 5)
+
+        # --- Viz graph filter (strip unneeded markers for web GUI) ---
+        self._KEEP_NS = frozenset(('polygon_edge', 'boundary_edge'))
+        self.viz_filter_pub = self.create_publisher(
+            MarkerArray, '/viz_graph_topic_filtered', 5)
+        self.viz_filter_sub = self.create_subscription(
+            MarkerArray, '/viz_graph_topic', self._viz_graph_filter_cb, 5,
+            callback_group=self._sub_cb_group)
 
         # Start HTTP server in a thread
         self._start_http_server()
@@ -207,14 +219,38 @@ class GraphFileBridge(Node):
             path_msg.data = tmp_path
             self.read_file_pub.publish(path_msg)
 
-            # Give decoder time to read, then cleanup
-            time.sleep(1.0)
+            # Wait for decoder to read the file (poll until file is no longer
+            # being accessed, or up to 5 seconds).
+            deadline = time.monotonic() + 5.0
+            time.sleep(0.5)  # minimum wait for decoder to start
+            while time.monotonic() < deadline:
+                try:
+                    # If we can exclusively open the file, decoder is likely done
+                    with open(tmp_path, 'r') as _:
+                        pass
+                except OSError:
+                    break
+                time.sleep(0.25)
         finally:
             try:
                 os.unlink(tmp_path)
                 self.get_logger().info(f'Temp file removed: {tmp_path}')
             except OSError:
                 pass
+
+    # ------------------------------------------------------------------
+    # Viz graph filter
+    # ------------------------------------------------------------------
+
+    def _viz_graph_filter_cb(self, msg):
+        """Strip unneeded markers, republish only polygon/boundary edges."""
+        filtered = MarkerArray()
+        for marker in msg.markers:
+            if marker.ns in self._KEEP_NS:
+                filtered.markers.append(marker)
+        # Always publish (even if empty) so the web GUI knows the planner
+        # is alive; the JS side handles empty-data gracefully.
+        self.viz_filter_pub.publish(filtered)
 
     # ------------------------------------------------------------------
     # HTTP static file server

@@ -129,16 +129,82 @@
       this.throttle_rate = opts.throttle_rate;
       this.queue_length = opts.queue_length;
       this.compression = opts.compression;
-      this._cb = null;
+      this._cb = null;       // wrapped callback registered with ros
+      this._rawCb = null;    // original user callback
+      this._throttleTimer = null;
     }
 
     subscribe(cb) {
-      this._cb = cb;
+      // Client-side throttle + queue fallback.
+      //
+      // rosbridge *should* honour throttle_rate and queue_length, but some
+      // versions ignore them.  The full roslibjs library has its own
+      // client-side throttle; we replicate the same "throttle with latest
+      // delivery" pattern here:
+      //
+      //  - While inside a throttle window, incoming messages are queued
+      //    (up to queue_length, default 1 = keep only the newest).
+      //  - When the window expires, the most recent queued message is
+      //    delivered to the user callback.
+      //
+      // This guarantees:
+      //   1. The callback never fires more often than throttle_rate ms.
+      //   2. The callback always receives the *freshest* available data.
+      //   3. No message is silently dropped without a newer replacement.
+
+      let wrappedCb = cb;
+
+      if (typeof this.throttle_rate === 'number' && this.throttle_rate > 0) {
+        const minInterval = this.throttle_rate;
+        const maxQueue = (typeof this.queue_length === 'number' && this.queue_length > 0)
+          ? this.queue_length : 1;
+        let pending = [];       // queued messages waiting for delivery
+        let lastFired = 0;      // timestamp of last callback invocation
+        let timer = null;       // scheduled delivery timer
+        const self = this;
+
+        wrappedCb = function throttledWithQueue(msg) {
+          const now = Date.now();
+
+          // If we're outside the throttle window, deliver immediately.
+          if (now - lastFired >= minInterval) {
+            lastFired = now;
+            pending.length = 0;
+            if (timer) { clearTimeout(timer); timer = null; }
+            cb(msg);
+            return;
+          }
+
+          // Inside the throttle window — queue the message.
+          pending.push(msg);
+          // Enforce queue_length: keep only the newest N messages.
+          while (pending.length > maxQueue) pending.shift();
+
+          // Schedule delivery of the newest queued message at the end of
+          // the current throttle window (if not already scheduled).
+          if (!timer) {
+            const remaining = minInterval - (now - lastFired);
+            timer = setTimeout(function deliverQueued() {
+              timer = null;
+              if (pending.length > 0) {
+                const latest = pending[pending.length - 1];
+                pending.length = 0;
+                lastFired = Date.now();
+                cb(latest);
+              }
+            }, remaining);
+            self._throttleTimer = timer;
+          }
+        };
+      }
+
+      this._rawCb = cb;
+      this._cb = wrappedCb;
       const topic = this.name;
       const ros = this.ros;
 
       if (!ros._topicSubs.has(topic)) ros._topicSubs.set(topic, []);
-      ros._topicSubs.get(topic).push(cb);
+      ros._topicSubs.get(topic).push(wrappedCb);
 
       const payload = {
         op: 'subscribe',
@@ -163,7 +229,13 @@
         ros._topicSubs.delete(topic);
         ros._send({ op: 'unsubscribe', topic });
       }
+      // Clear any pending throttle timer.
+      if (this._throttleTimer) {
+        clearTimeout(this._throttleTimer);
+        this._throttleTimer = null;
+      }
       this._cb = null;
+      this._rawCb = null;
     }
 
     publish(msg) {
