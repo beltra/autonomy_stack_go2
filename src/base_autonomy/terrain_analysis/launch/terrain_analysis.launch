@@ -1,36 +1,53 @@
 <launch>
 
   <arg name="scanVoxelSize" default="0.05"/>
-  <arg name="decayTime" default="1.2"/>
-  <arg name="noDecayDis" default="0.5"/>
-  <arg name="clearingDis" default="3.0"/>
+  <!-- Backup (old): decayTime default="1.2" -->
+  <arg name="decayTime" default="2.0"/>
+  <!-- Backup (old): noDecayDis default="0.5" -->
+  <arg name="noDecayDis" default="0.0"/>
+  <!-- Backup (old): clearingDis default="3.0" -->
+  <arg name="clearingDis" default="8.0"/>
   <arg name="useSorting" default="true"/>
-  <arg name="quantileZ" default="0.30"/>
+  <!-- Backup (old): quantileZ default="0.30" -->
+  <arg name="quantileZ" default="0.25"/>
   <arg name="considerDrop" default="false"/>
   <arg name="limitGroundLift" default="false"/>
-  <arg name="maxGroundLift" default="0.10"/>
+  <!-- Backup (old): maxGroundLift default="0.10" -->
+  <arg name="maxGroundLift" default="0.15"/>
   <arg name="clearDyObs" default="false"/>
-  <arg name="minDyObsDis" default="0.2"/>
+  <!-- Backup (old): minDyObsDis default="0.2" -->
+  <arg name="minDyObsDis" default="0.3"/>
   <arg name="minDyObsAngle" default="0.0"/>
   <arg name="minDyObsRelZ" default="-0.3"/>
   <arg name="absDyObsRelZThre" default="0.2"/>
   <arg name="minDyObsVFOV" default="-16.0"/>
   <arg name="maxDyObsVFOV" default="16.0"/>
   <arg name="minDyObsPointNum" default="1"/>
-  <arg name="noDataObstacle" default="false"/>
-  <arg name="noDataBlockSkipNum" default="2"/>
-  <arg name="minBlockPointNum" default="8"/>
+  <!-- Backup (old): noDataObstacle default="false" -->
+  <arg name="noDataObstacle" default="true"/>
+  <!-- Backup (old): noDataBlockSkipNum default="2" -->
+  <arg name="noDataBlockSkipNum" default="0"/>
+  <!-- Backup (old): minBlockPointNum default="8" -->
+  <arg name="minBlockPointNum" default="10"/>
   <arg name="maxElevBelowVeh" default="-0.6"/>
-  <arg name="noDataAreaMinX" default="0.15"/>
-  <arg name="noDataAreaMaxX" default="1.0"/>
-  <arg name="noDataAreaMinY" default="-0.5"/>
-  <arg name="noDataAreaMaxY" default="0.5"/>
-  <arg name="vehicleHeight" default="0.366"/>
+  <!-- Backup (old): noDataAreaMinX default="0.15" -->
+  <arg name="noDataAreaMinX" default="0.3"/>
+  <!-- Backup (old): noDataAreaMaxX default="1.0" -->
+  <arg name="noDataAreaMaxX" default="1.8"/>
+  <!-- Backup (old): noDataAreaMinY default="-0.5" -->
+  <arg name="noDataAreaMinY" default="-0.9"/>
+  <!-- Backup (old): noDataAreaMaxY default="0.5" -->
+  <arg name="noDataAreaMaxY" default="0.9"/>
+  <!-- Backup (old): vehicleHeight default="0.366" -->
+  <arg name="vehicleHeight" default="0.45"/>
   <arg name="voxelPointUpdateThre" default="100"/>
   <arg name="voxelTimeUpdateThre" default="2.0"/>
-  <arg name="minRelZ" default="-1.2"/>
-  <arg name="maxRelZ" default="0.35"/>
-  <arg name="disRatioZ" default="0.12"/>
+  <!-- Backup (old): minRelZ default="-1.2" -->
+  <arg name="minRelZ" default="-1.5"/>
+  <!-- Backup (old): maxRelZ default="0.35" -->
+  <arg name="maxRelZ" default="0.5"/>
+  <!-- Backup (old): disRatioZ default="0.12" -->
+  <arg name="disRatioZ" default="0.2"/>
 
   <node pkg="terrain_analysis" exec="terrainAnalysis" name="terrainAnalysis" output="screen">
     <param name="scanVoxelSize" value="$(var scanVoxelSize)" />

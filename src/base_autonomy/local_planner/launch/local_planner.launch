@@ -1,10 +1,12 @@
 <launch>
 
-  <arg name="sensorOffsetX" default="0.0"/>
+  <!-- Backup (old): sensorOffsetX default="0.0" -->
+  <arg name="sensorOffsetX" default="0.3"/>
   <arg name="sensorOffsetY" default="0.0"/>
   <arg name="cameraOffsetZ" default="0.0"/>
   <arg name="twoWayDrive" default="false"/>
-  <arg name="maxSpeed" default="1.0"/>
+  <!-- Backup (old): maxSpeed default="1.0" -->
+  <arg name="maxSpeed" default="0.6"/>
   <arg name="autonomyMode" default="false"/>
   <arg name="autonomySpeed" default="1.0"/>
   <arg name="joyToSpeedDelay" default="2.0"/>
@@ -23,10 +25,12 @@
     <param name="sensorOffsetY" value="$(var sensorOffsetY)" />
     <param name="twoWayDrive" value="$(var twoWayDrive)" />
     <param name="laserVoxelSize" value="0.05" />
-    <param name="terrainVoxelSize" value="0.1" />
+    <!-- Backup (old): terrainVoxelSize value="0.1" -->
+    <param name="terrainVoxelSize" value="0.2" />
     <param name="useTerrainAnalysis" value="true" />
     <param name="checkObstacle" value="true" />
-    <param name="checkRotObstacle" value="true" />
+    <!-- Backup (old): checkRotObstacle value="true" -->
+    <param name="checkRotObstacle" value="false" />
     <param name="adjacentRange" value="3.0" />
     <param name="obstacleHeightThre" value="0.3" />
     <param name="groundHeightThre" value="0.1" />
@@ -63,11 +67,14 @@
     <param name="pubSkipNum" value="1" />
     <param name="twoWayDrive" value="$(var twoWayDrive)" />
     <param name="lookAheadDis" value="0.5" />
-    <param name="yawRateGain" value="1.5" />
+    <!-- Backup (old): yawRateGain value="1.5" -->
+    <param name="yawRateGain" value="1.2" />
     <param name="stopYawRateGain" value="1.5" />
-    <param name="maxYawRate" value="80.0" />
+    <!-- Backup (old): maxYawRate value="80.0" -->
+    <param name="maxYawRate" value="50.0" />
     <param name="maxSpeed" value="$(var maxSpeed)" />
-    <param name="maxAccel" value="2.0" />
+    <!-- Backup (old): maxAccel value="2.0" -->
+    <param name="maxAccel" value="1.5" />
     <param name="switchTimeThre" value="1.0" />
     <param name="dirDiffThre" value="0.4" />
     <param name="omniDirDiffThre" value="1.5" />

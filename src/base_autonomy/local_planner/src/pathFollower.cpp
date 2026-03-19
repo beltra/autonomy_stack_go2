@@ -170,6 +170,12 @@ void pathHandler(const nav_msgs::msg::Path::ConstSharedPtr pathIn)
 
 void joystickHandler(const sensor_msgs::msg::Joy::ConstSharedPtr joy)
 {
+  if (joy->axes.size() < 6) {
+    RCLCPP_WARN_THROTTLE(nh->get_logger(), *nh->get_clock(), 2000,
+                         "Received /joy with insufficient axes (%zu), ignoring.", joy->axes.size());
+    return;
+  }
+
   joyTime = nh->now().seconds(); 
   joySpeedRaw = sqrt(joy->axes[3] * joy->axes[3] + joy->axes[4] * joy->axes[4]);
   joySpeed = joySpeedRaw;
@@ -202,6 +208,13 @@ void joystickHandler(const sensor_msgs::msg::Joy::ConstSharedPtr joy)
   // Safety shutdown (buttons[8]) — triggered by Web GUI emergency button
   if (joy->buttons.size() > 8 && joy->buttons[8] == 1) {
     isSafetyShutdown = true;
+    // Reset local motion state immediately, safety loop keeps publishing zero.
+    manualMode = false;
+    joyManualFwd = 0;
+    joyManualLeft = 0;
+    joyManualYaw = 0;
+    vehicleSpeed = 0;
+    vehicleYawRate = 0;
     RCLCPP_ERROR(nh->get_logger(), "EMERGENCY SHUTDOWN triggered from Web GUI! Sending StandDown.");
   }
 
@@ -210,6 +223,17 @@ void joystickHandler(const sensor_msgs::msg::Joy::ConstSharedPtr joy)
     if (isSafetyShutdown) {
       isSafetyShutdown = false;
       hasSentStandDown = false;
+      // Clear pending motion and path to avoid immediate stale replanning movement.
+      manualMode = false;
+      joyManualFwd = 0;
+      joyManualLeft = 0;
+      joyManualYaw = 0;
+      joySpeed = 0;
+      vehicleSpeed = 0;
+      vehicleYawRate = 0;
+      pathInit = false;
+      pathPointID = 0;
+      path.poses.clear();
       RCLCPP_INFO(nh->get_logger(), "REBOOT triggered from Web GUI! Sending StandUp and clearing goals.");
       if (is_real_robot) {
         sport_req.StandUp(req);
@@ -404,13 +428,22 @@ int main(int argc, char** argv)
       continue;
     }
 
-    // === Timeout: auto-disable manual mode if no joy msg in 0.5s ===
+    // === Timeout: auto-disable manual mode and force stop if joy stream drops ===
     if (manualMode && (currentTime - joyTime > joyTimeoutSec)) {
       manualMode = false;
       joyManualFwd = 0;
       joyManualLeft = 0;
       joyManualYaw = 0;
-      RCLCPP_WARN(nh->get_logger(), "Web GUI joystick timeout — resuming planner control.");
+      cmd_vel.header.stamp = nh->now();
+      cmd_vel.twist.linear.x = 0;
+      cmd_vel.twist.linear.y = 0;
+      cmd_vel.twist.angular.z = 0;
+      pubSpeed->publish(cmd_vel);
+      if (is_real_robot) {
+        sport_req.StopMove(req);
+        pubGo2Request->publish(req);
+      }
+      RCLCPP_WARN(nh->get_logger(), "Web GUI joystick timeout - forcing stop and resuming planner control.");
     }
 
     // === PRIORITY 2: Web GUI manual teleop (overrides planner) ===
