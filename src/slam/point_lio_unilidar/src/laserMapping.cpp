@@ -920,7 +920,7 @@ int main(int argc, char **argv)
 
     /*** ROS subscribe initialization ***/
     
-    auto sub_pcl = node->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 10, standard_pcl_cbk);
+    auto sub_pcl = node->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 5, standard_pcl_cbk);
 
     auto sub_imu = node->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 200, imu_cbk);
 

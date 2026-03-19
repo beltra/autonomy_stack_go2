@@ -86,6 +86,7 @@ float joyManualFwd = 0;
 float joyManualLeft = 0;
 float joyManualYaw = 0;
 int safetyStop = 0;
+bool stopped = false;
 
 float vehicleX = 0;
 float vehicleY = 0;
@@ -287,7 +288,7 @@ int main(int argc, char** argv)
   nh->get_parameter("enableClassicWalk", enableClassicWalk);
   nh->get_parameter("disableClassicWalkOnExit", disableClassicWalkOnExit);
 
-  auto subOdom = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 1, odomHandler);
+  auto subOdom = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 5, odomHandler);
 
   auto subPath = nh->create_subscription<nav_msgs::msg::Path>("/path", 5, pathHandler);
 
@@ -479,12 +480,17 @@ int main(int argc, char** argv)
         if (is_real_robot)
         {
           if (cmd_vel.twist.linear.x == 0 && cmd_vel.twist.linear.y == 0 && cmd_vel.twist.angular.z == 0){
-          	sport_req.StopMove(req);
+            if (!stopped) {
+              sport_req.StopMove(req);
+              pubGo2Request->publish(req);
+              stopped = true;
+            }
           }
           else{
-               sport_req.Move(req, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
-          }
-          pubGo2Request->publish(req);
+            sport_req.Move(req, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
+            pubGo2Request->publish(req);
+            stopped = false;
+        }
         }
       }
     }
