@@ -1,0 +1,3 @@
+- Implementare QoS dei topic
+- Check dimensione code
+- Tuning parametri slam e perception

@@ -13,6 +13,11 @@
 
 let ros = null;               // ROSLIB.Ros connection
 let connected = false;
+let shouldAutoReconnect = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+const RECONNECT_BASE_MS = 500;
+const RECONNECT_MAX_MS = 10000;
 
 // ROS topic handles (created on connect)
 let subOdom = null;
@@ -53,6 +58,12 @@ let goalMode = false;
 let teleopFwd = 0, teleopYaw = 0;
 let teleopActive = false;
 let teleopInterval = null;
+
+// Render scheduling
+let renderDirty = true;
+let lastRenderTs = 0;
+const RENDER_FPS = 30;
+const RENDER_MIN_DT = 1000 / RENDER_FPS;
 
 // HTTP base (for bridge API)
 let httpBase = '';
@@ -95,9 +106,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('file-upload-input').addEventListener('change', uploadGraph);
   document.getElementById('btn-center-robot').addEventListener('click', centerOnRobot);
   document.getElementById('btn-set-goal').addEventListener('click', toggleGoalMode);
-  document.getElementById('chk-follow-robot').addEventListener('change', e => { followRobot = e.target.checked; });
-  document.getElementById('chk-show-graph').addEventListener('change', e => { showGraph = e.target.checked; });
-  document.getElementById('chk-show-path').addEventListener('change', e => { showPath = e.target.checked; });
+  document.getElementById('chk-follow-robot').addEventListener('change', e => { followRobot = e.target.checked; markRenderDirty(); });
+  document.getElementById('chk-show-graph').addEventListener('change', e => { showGraph = e.target.checked; markRenderDirty(); });
+  document.getElementById('chk-show-path').addEventListener('change', e => { showPath = e.target.checked; markRenderDirty(); });
   document.getElementById('chk-attemptable').addEventListener('change', publishAttemptable);
   document.getElementById('chk-update-vgraph').addEventListener('change', publishUpdateVGraph);
   document.getElementById('btn-safety-shutdown').addEventListener('click', safetyShutdown);
@@ -128,6 +139,7 @@ window.addEventListener('DOMContentLoaded', () => {
 function resizeCanvas() {
   canvas.width = canvas.parentElement.clientWidth;
   canvas.height = canvas.parentElement.clientHeight;
+  markRenderDirty();
 }
 
 /* ====================================================================
@@ -156,24 +168,55 @@ function connectRos() {
 
   ros.on('connection', () => {
     connected = true;
+    shouldAutoReconnect = true;
+    reconnectAttempts = 0;
+    clearReconnectTimer();
     setConnStatus(true);
+    cleanupTopics();
     setupTopics();
+    markRenderDirty();
   });
   ros.on('error', (err) => {
     console.error('ROS error:', err);
+    setGraphStatus('ROS socket error. Retrying...');
   });
   ros.on('close', () => {
     connected = false;
     setConnStatus(false);
     cleanupTopics();
+    stopTeleop('Disconnected. Teleop stopped.');
+    scheduleReconnect();
+    markRenderDirty();
   });
 }
 
 function disconnectRos() {
+  shouldAutoReconnect = false;
+  clearReconnectTimer();
+  stopTeleop();
   if (ros) ros.close();
   connected = false;
+  ros = null;
   setConnStatus(false);
   cleanupTopics();
+  markRenderDirty();
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function scheduleReconnect() {
+  if (!shouldAutoReconnect || connected || reconnectTimer) return;
+  const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * (2 ** Math.min(reconnectAttempts, 6)));
+  reconnectAttempts += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (!connected && shouldAutoReconnect) connectRos();
+  }, delay);
 }
 
 function setConnStatus(ok) {
@@ -276,6 +319,7 @@ function onOdom(msg) {
   document.getElementById('robot-y').textContent = robotState.y.toFixed(2);
   document.getElementById('robot-yaw').textContent = (robotState.yaw * 180 / Math.PI).toFixed(1) + '°';
   document.getElementById('goal-status').textContent = goalReached === null ? '—' : (goalReached ? '✓ Yes' : '✗ No');
+  markRenderDirty();
 }
 
 /* ====================================================================
@@ -300,13 +344,15 @@ function onVizGraph(msg) {
     }
   }
   
-  if (foundValidEdges) {
+  if (foundValidEdges || graphEdges.length > 0) {
     graphEdges = edges;
+    markRenderDirty();
   }
 }
 
 function onVizPath(msg) {
   globalPath = (msg.points || []).map(p => ({ x: p.x, y: p.y }));
+  markRenderDirty();
 }
 
 function onVizNode(msg) {
@@ -320,6 +366,7 @@ function onVizNode(msg) {
     }
   }
   vizGoalMarkers = markers;
+  markRenderDirty();
 }
 
 /* ====================================================================
@@ -345,6 +392,7 @@ function onWheel(e) {
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
   view.scale = Math.max(1, Math.min(500, view.scale * factor));
   document.getElementById('map-zoom').textContent = 'Zoom: ' + view.scale.toFixed(1) + 'x';
+  markRenderDirty();
 }
 
 function onMouseDown(e) {
@@ -353,6 +401,7 @@ function onMouseDown(e) {
     _dragView = { cx: view.cx, cy: view.cy };
     followRobot = false;
     document.getElementById('chk-follow-robot').checked = false;
+    markRenderDirty();
   }
 }
 
@@ -368,12 +417,14 @@ function onMouseMove(e) {
     const dy = (e.clientY - _dragStart.y) / view.scale;
     view.cx = _dragView.cx - dx;
     view.cy = _dragView.cy + dy;
+    markRenderDirty();
   }
 }
 
 function onMouseUp(e) {
   _dragStart = null;
   _dragView = null;
+  markRenderDirty();
 }
 
 function onMapClick(e) {
@@ -385,8 +436,19 @@ function onMapClick(e) {
 }
 
 function renderLoop() {
-  render();
+  const now = performance.now();
+  const shouldFollowRender = followRobot && connected;
+  const shouldDragRender = !!_dragStart;
+  if ((renderDirty || shouldFollowRender || shouldDragRender) && (now - lastRenderTs >= RENDER_MIN_DT)) {
+    render();
+    renderDirty = false;
+    lastRenderTs = now;
+  }
   requestAnimationFrame(renderLoop);
+}
+
+function markRenderDirty() {
+  renderDirty = true;
 }
 
 function render() {
@@ -533,6 +595,7 @@ function drawRobot() {
 function centerOnRobot() {
   view.cx = robotState.x;
   view.cy = robotState.y;
+  markRenderDirty();
 }
 
 /* ====================================================================
@@ -546,6 +609,7 @@ function toggleGoalMode() {
   btn.classList.toggle('active', goalMode);
   hint.classList.toggle('hidden', !goalMode);
   canvas.style.cursor = goalMode ? 'crosshair' : '';
+  markRenderDirty();
 }
 
 function cancelGoalMode() {
@@ -553,6 +617,7 @@ function cancelGoalMode() {
   document.getElementById('btn-set-goal').classList.remove('active');
   document.getElementById('goalpoint-hint').classList.add('hidden');
   canvas.style.cursor = '';
+  markRenderDirty();
 }
 
 function sendGoalPoint(x, y) {
@@ -564,17 +629,17 @@ function sendGoalPoint(x, y) {
     axes: [0, 0, -1.0, 0, 1.0, 1.0, 0, 0],
     buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
   });
-  pubJoy.publish(joyMsg);
+  safePublish(pubJoy, joyMsg);
 
   // Then send goalpoint
   const goalMsg = new ROSLIB.Message({
     header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'map' },
     point: { x: x, y: y, z: robotState.z }
   });
-  pubGoalPoint.publish(goalMsg);
+  safePublish(pubGoalPoint, goalMsg);
 
   // Publish twice (like the RViz tool does with usleep)
-  setTimeout(() => pubGoalPoint.publish(goalMsg), 15);
+  setTimeout(() => safePublish(pubGoalPoint, goalMsg), 15);
 
   setGraphStatus(`Goal sent: (${x.toFixed(1)}, ${y.toFixed(1)})`);
 }
@@ -585,7 +650,7 @@ function sendGoalPoint(x, y) {
 
 function resetVGraph() {
   if (!pubResetVGraph) return;
-  pubResetVGraph.publish(new ROSLIB.Message({}));
+  safePublish(pubResetVGraph, new ROSLIB.Message({}));
   setGraphStatus('Visibility graph reset.');
 }
 
@@ -596,20 +661,20 @@ function resumeNav() {
     axes: [0, 0, -1.0, 0, 1.0, 1.0, 0, 0],
     buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
   });
-  pubJoy.publish(msg);
+  safePublish(pubJoy, msg);
   setGraphStatus('Resume navigation sent.');
 }
 
 function publishAttemptable() {
   if (!pubAttemptable) return;
   const val = document.getElementById('chk-attemptable').checked;
-  pubAttemptable.publish(new ROSLIB.Message({ data: val }));
+  safePublish(pubAttemptable, new ROSLIB.Message({ data: val }));
 }
 
 function publishUpdateVGraph() {
   if (!pubUpdateVGraph) return;
   const val = document.getElementById('chk-update-vgraph').checked;
-  pubUpdateVGraph.publish(new ROSLIB.Message({ data: val }));
+  safePublish(pubUpdateVGraph, new ROSLIB.Message({ data: val }));
 }
 
 /* ====================================================================
@@ -649,7 +714,7 @@ function uploadGraph(event) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const content = e.target.result;
-    pubUploadGraph.publish(new ROSLIB.Message({ data: content }));
+    safePublish(pubUploadGraph, new ROSLIB.Message({ data: content }));
     setGraphStatus(`Graph uploaded: ${file.name}`);
   };
   reader.readAsText(file);
@@ -700,7 +765,7 @@ function safetyShutdown() {
   // Publish 5 times at 50ms intervals for network reliability
   let count = 0;
   const sendInterval = setInterval(() => {
-    pubJoy.publish(shutdownMsg);
+    safePublish(pubJoy, shutdownMsg);
     count++;
     if (count >= 5) {
       clearInterval(sendInterval);
@@ -726,13 +791,21 @@ function rebootRobot() {
 
   console.log('REBOOT triggered!');
 
-  // Send reboot joy message (buttons[9] = 1)
+  // Send reboot joy message (buttons[9] = 1) multiple times for reliability.
   const rebootMsg = new ROSLIB.Message({
     header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'web_gui_emergency' },
     axes: [0, 0, -1.0, 0, 0, 1.0, 0, 0],
     buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
   });
-  pubJoy.publish(rebootMsg);
+
+  let count = 0;
+  const sendInterval = setInterval(() => {
+    safePublish(pubJoy, rebootMsg);
+    count++;
+    if (count >= 5) {
+      clearInterval(sendInterval);
+    }
+  }, 50);
 
   // // Send an empty point to clear planner goals
   // const emptyGoalMsg = new ROSLIB.Message({
@@ -866,5 +939,34 @@ function sendTeleopJoy() {
     axes: [-teleopYaw, 0, 1.0, 0, teleopFwd, manualTrigger, 0, 0],
     buttons: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
   });
-  pubJoy.publish(msg);
+  safePublish(pubJoy, msg);
+}
+
+function stopTeleop(statusText = '') {
+  teleopActive = false;
+  teleopFwd = 0;
+  teleopYaw = 0;
+  if (teleopInterval) {
+    clearInterval(teleopInterval);
+    teleopInterval = null;
+  }
+  const fwdEl = document.getElementById('teleop-fwd');
+  const yawEl = document.getElementById('teleop-yaw');
+  if (fwdEl) fwdEl.textContent = '0.00';
+  if (yawEl) yawEl.textContent = '0.00';
+  if (statusText) {
+    document.getElementById('shutdown-status').textContent = statusText;
+  }
+  markRenderDirty();
+}
+
+function safePublish(topic, msg) {
+  if (!topic || !connected) return false;
+  try {
+    topic.publish(msg);
+    return true;
+  } catch (e) {
+    console.error('Publish failed:', e);
+    return false;
+  }
 }
